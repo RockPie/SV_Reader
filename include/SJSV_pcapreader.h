@@ -12,6 +12,8 @@
 #include "UdpLayer.h" // for .pcap file readings
 #include "HttpLayer.h" // for .pcap file readings\
 
+#include "TDataType.h" // for .root file reading
+
 #define DAQ_DATA_SRC_PORT   6006
 #define ESS_SC_SRC_PORT     65535
 #define FEC_SRC_PORT        6007
@@ -22,11 +24,24 @@
 #define I2C_SRC_PORT        6604
 #define FEC_SYS_SRC_PORT    6023
 
+#define LEN_RAW_FRAME_BYTE  6
+#define LEN_RAW_HEADER_BYTE 16
+
 INITIALIZE_EASYLOGGINGPP
 
 class SJSV_pcapreader {
     public:
-
+        struct uni_frame{
+            bool        flag_daq;   // 1 bit, 1 - daq, 0 - timestamp
+            uint8_t     offset;     // 5 bits
+            uint8_t     vmm_id;     // 5 bits
+            uint16_t    adc;        // 10 bits
+            uint16_t    bcid;       // 12 bits
+            bool        daqdata38;  // 1 bit
+            uint8_t     channel;    // 6 bits
+            uint8_t     tdc;        // 8 bits
+            uint64_t    timestamp;  // 40 bits
+        };
     public:
         SJSV_pcapreader();
         SJSV_pcapreader(std::string _filename_str);
@@ -38,19 +53,32 @@ class SJSV_pcapreader {
                 LOG(ERROR) << "Filename is empty";
                 return;
             }
-            _filename = _filename_str; 
+            filename = _filename_str; 
         }
 
         // * Read .pcap file
         // * @return true if success, false if fail
         bool read_pcapfile();
 
+        // * Test decoding the first packet
+        // * @return -1 if fail, otherwise the index of the first daq packet
+        int test_decode_first_packet();
+
+        // * Decode .pcap packet
+        // * @return uni_frame
+        std::vector<uni_frame> decode_pcap_packet(const pcpp::Packet &_parsedPacket);
+        inline std::vector<uni_frame> decode_pcap_packet(pcpp::RawPacket _rawPacket){
+            pcpp::Packet parsedPacket(&_rawPacket);
+            return decode_pcap_packet(parsedPacket);
+        }
+
     private:
-        std::string protocol2str(pcpp::ProtocolType protocol);
+        std::string protocol2str(pcpp::ProtocolType _protocol);
+        uint32_t Gray2bin32(uint32_t _num);
 
     private:
         bool is_reader_valid;
 
-        std::string _filename;
-        pcpp::IFileReaderDevice* _reader;
+        std::string filename;
+        pcpp::IFileReaderDevice* reader;
 };

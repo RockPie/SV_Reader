@@ -10,6 +10,7 @@ int main(int argc, char** argv) {
     std::cout << "Hello, world!" << std::endl;
     SJSV_pcapreader pcapreader("../data/traffic_2023073101.pcap");
     pcapreader.read_pcapfile();
+    pcapreader.test_decode_first_packet();
     return 0;
 }
 
