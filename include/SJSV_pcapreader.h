@@ -3,18 +3,18 @@
 #include "easylogging++.h"
 
 #include "stdlib.h"
-#include "PcapFileDevice.h" // for .pcap file reading
-#include "SystemUtils.h" // for .pcap file reading
-#include "Packet.h" // for .pcap file readings
-#include "EthLayer.h" // for .pcap file readings
-#include "IPv4Layer.h" // for .pcap file readings
-#include "TcpLayer.h" // for .pcap file readings
-#include "UdpLayer.h" // for .pcap file readings
-#include "HttpLayer.h" // for .pcap file readings\
+#include "PcapFileDevice.h"
+#include "SystemUtils.h" 
+#include "Packet.h" 
+#include "EthLayer.h" 
+#include "IPv4Layer.h"
+#include "TcpLayer.h"
+#include "UdpLayer.h" 
+#include "HttpLayer.h"
 
-#include "TDataType.h" // for .root file reading
-#include "TFile.h" // for .root file reading
-#include "TTree.h" // for .root file reading
+#include "TDataType.h"
+#include "TFile.h"
+#include "TTree.h" 
 
 #define DAQ_DATA_SRC_PORT   6006
 #define ESS_SC_SRC_PORT     65535
@@ -29,7 +29,7 @@
 #define LEN_RAW_FRAME_BYTE  6
 #define LEN_RAW_HEADER_BYTE 16
 
-INITIALIZE_EASYLOGGINGPP
+// INITIALIZE_EASYLOGGINGPP
 
 class SJSV_pcapreader {
     public:

@@ -1,6 +1,9 @@
 #include <iostream>
 
+#include "easylogging++.h"
 #include "SJSV_pcapreader.h"
+#include "SJSV_eventbuilder.h"
+
 
 void set_easylogger(); // set easylogging++ configurations
 
@@ -23,6 +26,10 @@ int main(int argc, char** argv) {
         LOG(INFO) << "Save to rootfile success";
     else
         LOG(ERROR) << "Save to rootfile fail";
+
+    // * Test eventbuilder
+    SJSV_eventbuilder eventbuilder;
+    eventbuilder.load_raw_data(filename_root);
 
     return 0;
 }

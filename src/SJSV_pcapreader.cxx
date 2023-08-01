@@ -60,21 +60,21 @@ bool SJSV_pcapreader::read_pcapfile() {
 
         pcpp::EthLayer* ethernetLayer = parsedPacket.getLayerOfType<pcpp::EthLayer>();
         if (ethernetLayer == NULL) {
-            LOG(ERROR) << "Cannot find ethernet layer for packet #" << _packet_num;
+            LOG(WARNING) << "Cannot find ethernet layer for packet #" << _packet_num;
         } else {
             _eth_packet_num++;
         }
 
         pcpp::IPv4Layer* ipLayer = parsedPacket.getLayerOfType<pcpp::IPv4Layer>();
         if (ipLayer == NULL) {
-            LOG(ERROR) << "Cannot find IPv4 layer for packet #" << _packet_num;
+            LOG(WARNING) << "Cannot find IPv4 layer for packet #" << _packet_num;
         } else {
             _ip_packet_num++;
         }
 
         pcpp::UdpLayer* udpLayer = parsedPacket.getLayerOfType<pcpp::UdpLayer>();
         if (udpLayer == NULL) {
-            LOG(ERROR) << "Cannot find UDP layer for packet #" << _packet_num;
+            LOG(WARNING) << "Cannot find UDP layer for packet #" << _packet_num;
         } else {
             _udp_packet_num++;
             if (udpLayer->getSrcPort() == DAQ_DATA_SRC_PORT) {
@@ -300,23 +300,25 @@ bool SJSV_pcapreader::save_to_rootfile(const std::string &_rootfilename) {
 
     TTree* _tree = new TTree("tree", "tree");
 
-    uint32_t _offset;
-    uint32_t _vmm_id;
-    uint32_t _adc;
-    uint32_t _bcid;
-    uint32_t _daqdata38;
-    uint32_t _channel;
-    uint32_t _tdc;
+    uint8_t  _offset;
+    uint8_t  _vmm_id;
+    uint16_t _adc;
+    uint16_t _bcid;
+    bool     _daqdata38;
+    uint8_t  _channel;
+    uint8_t  _tdc;
     uint64_t _timestamp;
+    bool    _flag_daq;
 
-    _tree->Branch("offset",    &_offset,    "offset/i");
-    _tree->Branch("vmm_id",    &_vmm_id,    "vmm_id/i");
-    _tree->Branch("adc",       &_adc,       "adc/i");
-    _tree->Branch("bcid",      &_bcid,      "bcid/i");
-    _tree->Branch("daqdata38", &_daqdata38, "daqdata38/i");
-    _tree->Branch("channel",   &_channel,   "channel/i");
-    _tree->Branch("tdc",       &_tdc,       "tdc/i");
+    _tree->Branch("offset",    &_offset,    "offset/b");
+    _tree->Branch("vmm_id",    &_vmm_id,    "vmm_id/b");
+    _tree->Branch("adc",       &_adc,       "adc/s");
+    _tree->Branch("bcid",      &_bcid,      "bcid/s");
+    _tree->Branch("daqdata38", &_daqdata38, "daqdata38/O");
+    _tree->Branch("channel",   &_channel,   "channel/b");
+    _tree->Branch("tdc",       &_tdc,       "tdc/b");
     _tree->Branch("timestamp", &_timestamp, "timestamp/l");
+    _tree->Branch("flag_daq",  &_flag_daq,  "flag_daq/O");
 
     for (auto _frame : *uni_frame_vec) {
         _offset    = _frame.offset;
@@ -327,6 +329,7 @@ bool SJSV_pcapreader::save_to_rootfile(const std::string &_rootfilename) {
         _channel   = _frame.channel;
         _tdc       = _frame.tdc;
         _timestamp = _frame.timestamp;
+        _flag_daq  = _frame.flag_daq;
         _tree->Fill();
     }
 
