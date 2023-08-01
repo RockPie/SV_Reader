@@ -1,0 +1,23 @@
+cmake_minimum_required(VERSION 3.12)
+set(CMAKE_CXX_STANDARD 17)
+
+project(SV_Reader)
+
+find_package(ROOT REQUIRED COMPONENTS
+    Core 
+)
+
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+add_library(SV_Reader SHARED
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SJSV_pcapreader.cxx
+)
+
+target_link_libraries(SV_Reader
+    PUBLIC
+        ROOT::Core
+)
+
+add_executable(raw_data_processing      ${CMAKE_CURRENT_SOURCE_DIR}/script/SJSV_rawdata.cxx)
+
+target_link_libraries(raw_data_processing  SV_Reader)
