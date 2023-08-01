@@ -8,6 +8,8 @@ set(CMAKE_OSX_ARCHITECTURES arm64)
 
 find_package(ROOT REQUIRED COMPONENTS
     Core 
+    RIO
+    Tree
 )
 
 # define PcapPlusPlus location
@@ -27,6 +29,8 @@ add_library(SV_Reader SHARED
 target_link_libraries(SV_Reader
     PUBLIC
         ROOT::Core
+        ROOT::RIO
+        ROOT::Tree
         ${PCAPPP_LIB_DIR}/libCommon++.a
         ${PCAPPP_LIB_DIR}/libPacket++.a
         ${PCAPPP_LIB_DIR}/libPcap++.a

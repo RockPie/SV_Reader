@@ -13,6 +13,8 @@
 #include "HttpLayer.h" // for .pcap file readings\
 
 #include "TDataType.h" // for .root file reading
+#include "TFile.h" // for .root file reading
+#include "TTree.h" // for .root file reading
 
 #define DAQ_DATA_SRC_PORT   6006
 #define ESS_SC_SRC_PORT     65535
@@ -53,6 +55,15 @@ class SJSV_pcapreader {
                 LOG(ERROR) << "Filename is empty";
                 return;
             }
+            if (this->is_reader_valid && reader != nullptr) {
+                reader->close();
+                delete reader;
+                this->is_reader_valid = false;
+            }
+            if (this->is_uniframe_vec_valid){
+                this->uni_frame_vec->clear();
+                this->is_uniframe_vec_valid = false;
+            }
             filename = _filename_str; 
         }
 
@@ -72,13 +83,25 @@ class SJSV_pcapreader {
             return decode_pcap_packet(parsedPacket);
         }
 
+        // * Decode .pcap file
+        // * @return -1 if fail, otherwise the length of the vector
+        int64_t full_decode_pcapfile();
+
+        bool save_to_rootfile(const std::string &_rootfilename);
+
     private:
+        // * Convert protocol type to string
         std::string protocol2str(pcpp::ProtocolType _protocol);
+
+        // * Convert gray code to binary
         uint32_t Gray2bin32(uint32_t _num);
 
     private:
         bool is_reader_valid;
+        bool is_uniframe_vec_valid;
 
         std::string filename;
         pcpp::IFileReaderDevice* reader;
+
+        std::vector<uni_frame>* uni_frame_vec;
 };

@@ -2,16 +2,20 @@
 
 SJSV_pcapreader::SJSV_pcapreader():
     filename(""),
-    is_reader_valid(false) {
+    is_reader_valid(false),
+    is_uniframe_vec_valid(false) {
+        this->uni_frame_vec = new std::vector<uni_frame>;
 }
 
 SJSV_pcapreader::SJSV_pcapreader(std::string _filename_str):
     filename(_filename_str),
-    is_reader_valid(false) {
+    is_reader_valid(false),
+    is_uniframe_vec_valid(false) {
     if (filename.empty()) {
         LOG(ERROR) << "Filename is empty";
         return;
     }
+    this->uni_frame_vec = new std::vector<uni_frame>;
 }
 
 SJSV_pcapreader::~SJSV_pcapreader() {
@@ -19,6 +23,9 @@ SJSV_pcapreader::~SJSV_pcapreader() {
         reader->close();
     if (reader != NULL)
         delete reader;
+
+    if (uni_frame_vec != nullptr)
+        delete uni_frame_vec;
 }
 
 bool SJSV_pcapreader::read_pcapfile() {
@@ -155,6 +162,19 @@ int SJSV_pcapreader::test_decode_first_packet(){
         _packet_num++;
     }
 
+    reader->close();
+
+    reader = pcpp::IFileReaderDevice::getReader(filename);
+
+    if (reader == NULL) {
+        LOG(ERROR) << "Cannot read file " << filename;
+        return false;
+    }
+    if (!reader->open()) {
+        LOG(ERROR) << "Cannot open file " << filename;
+        return false;
+    }
+
     return _packet_num;
 }
 
@@ -206,8 +226,6 @@ std::vector<SJSV_pcapreader::uni_frame> SJSV_pcapreader::decode_pcap_packet(cons
         _frame_array.push_back(_frame);
     }
 
-
-
     return _frame_array;
 }
 
@@ -218,4 +236,102 @@ uint32_t SJSV_pcapreader::Gray2bin32(uint32_t _num) {
     _num = _num ^ (_num >> 2);
     _num = _num ^ (_num >> 1);
     return _num;
+}
+
+int64_t SJSV_pcapreader::full_decode_pcapfile(){
+    if (!is_reader_valid) {
+        LOG(ERROR) << "Reader is not valid";
+        return -1;
+    }
+
+    is_uniframe_vec_valid = false;
+    int64_t _length_vec = 0;
+    int64_t _daq_frame_num = 0;
+    int64_t _time_frame_num = 0;
+
+    pcpp::RawPacket rawPacket;
+    while(reader->getNextPacket(rawPacket)) {
+        pcpp::Packet parsedPacket(&rawPacket);
+        pcpp::UdpLayer* udpLayer = parsedPacket.getLayerOfType<pcpp::UdpLayer>();
+        if (udpLayer != NULL) {
+            if (udpLayer->getSrcPort() == DAQ_DATA_SRC_PORT) {
+                auto _frame_array = this->decode_pcap_packet(parsedPacket);
+                for (auto _frame : _frame_array) {
+                    this->uni_frame_vec->push_back(_frame);
+                    _length_vec++;
+                    if (_frame.flag_daq) {
+                        _daq_frame_num++;
+                    } else {
+                        _time_frame_num++;
+                    }
+                }
+            }
+        }
+    }
+
+    if (_length_vec == 0) {
+        LOG(ERROR) << "Cannot find any DAQ packet";
+        return -1;
+    }
+
+    LOG(INFO) << "DAQ frame number:  " << _daq_frame_num;
+    LOG(INFO) << "Time frame number: " << _time_frame_num;
+
+    is_uniframe_vec_valid = true;
+    return _length_vec;
+}
+
+bool SJSV_pcapreader::save_to_rootfile(const std::string &_rootfilename) {
+    if (!is_uniframe_vec_valid) {
+        LOG(ERROR) << "Uniframe vector is not valid";
+        return false;
+    }
+    if (_rootfilename.empty()) {
+        LOG(ERROR) << "Root filename is empty";
+        return false;
+    }
+
+
+    TFile* _rootfile = new TFile(_rootfilename.c_str(), "RECREATE");
+    if (_rootfile->IsZombie()) {
+        LOG(ERROR) << "Cannot open root file " << _rootfilename;
+        return false;
+    }
+
+    TTree* _tree = new TTree("tree", "tree");
+
+    uint32_t _offset;
+    uint32_t _vmm_id;
+    uint32_t _adc;
+    uint32_t _bcid;
+    uint32_t _daqdata38;
+    uint32_t _channel;
+    uint32_t _tdc;
+    uint64_t _timestamp;
+
+    _tree->Branch("offset",    &_offset,    "offset/i");
+    _tree->Branch("vmm_id",    &_vmm_id,    "vmm_id/i");
+    _tree->Branch("adc",       &_adc,       "adc/i");
+    _tree->Branch("bcid",      &_bcid,      "bcid/i");
+    _tree->Branch("daqdata38", &_daqdata38, "daqdata38/i");
+    _tree->Branch("channel",   &_channel,   "channel/i");
+    _tree->Branch("tdc",       &_tdc,       "tdc/i");
+    _tree->Branch("timestamp", &_timestamp, "timestamp/l");
+
+    for (auto _frame : *uni_frame_vec) {
+        _offset    = _frame.offset;
+        _vmm_id    = _frame.vmm_id;
+        _adc       = _frame.adc;
+        _bcid      = _frame.bcid;
+        _daqdata38 = _frame.daqdata38;
+        _channel   = _frame.channel;
+        _tdc       = _frame.tdc;
+        _timestamp = _frame.timestamp;
+        _tree->Fill();
+    }
+
+    _rootfile->Write();
+    _rootfile->Close();
+
+    return true;
 }

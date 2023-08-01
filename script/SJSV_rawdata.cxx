@@ -7,10 +7,23 @@ void set_easylogger(); // set easylogging++ configurations
 int main(int argc, char** argv) {
     START_EASYLOGGINGPP(argc, argv);
     set_easylogger();
-    std::cout << "Hello, world!" << std::endl;
-    SJSV_pcapreader pcapreader("../data/traffic_2023073101.pcap");
+    LOG(INFO) << "Start SJSV_rawdata.cxx";
+
+    std::string filename = "../data/traffic_2023073101.pcap";
+
+    // split filename according to '_'
+    std::string filename_root = "../tmp/raw_" + filename.substr(filename.find_last_of("_")+1, filename.find_last_of(".")-filename.find_last_of("_")-1) + ".root";
+
+    // * Test pcapreader
+    SJSV_pcapreader pcapreader(filename);
     pcapreader.read_pcapfile();
     pcapreader.test_decode_first_packet();
+    auto vec_len = pcapreader.full_decode_pcapfile();
+    if (pcapreader.save_to_rootfile(filename_root))
+        LOG(INFO) << "Save to rootfile success";
+    else
+        LOG(ERROR) << "Save to rootfile fail";
+
     return 0;
 }
 
