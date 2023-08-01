@@ -3,15 +3,21 @@ set(CMAKE_CXX_STANDARD 17)
 
 project(SV_Reader)
 
+# set architecture to aarch64
+set(CMAKE_OSX_ARCHITECTURES arm64)
+
 find_package(ROOT REQUIRED COMPONENTS
     Core 
 )
 
 # define PcapPlusPlus location
-set(PCAPPP_INCLUDE_DIR /opt/homebrew/Cellar/pcapplusplus/22.11/include/pcapplusplus)
+set(PCAPPP_INCLUDE_DIR /Users/geoffrey/sw/pcapplusplus-22.11/header)
+set(PCAPPP_LIB_DIR /Users/geoffrey/sw/pcapplusplus-22.11)
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${PCAPPP_INCLUDE_DIR}
+)
 
 add_library(SV_Reader SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/src/easylogging++.cc
@@ -21,13 +27,19 @@ add_library(SV_Reader SHARED
 target_link_libraries(SV_Reader
     PUBLIC
         ROOT::Core
+        ${PCAPPP_LIB_DIR}/libCommon++.a
+        ${PCAPPP_LIB_DIR}/libPacket++.a
+        ${PCAPPP_LIB_DIR}/libPcap++.a
+        pcap pthread
 )
 
 target_include_directories(SV_Reader
     PUBLIC
         ${PCAPPP_INCLUDE_DIR}
+
 )
 
 add_executable(raw_data_processing      ${CMAKE_CURRENT_SOURCE_DIR}/script/SJSV_rawdata.cxx)
+
 
 target_link_libraries(raw_data_processing  SV_Reader)
