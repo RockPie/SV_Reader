@@ -10,6 +10,8 @@ find_package(ROOT REQUIRED COMPONENTS
     Core 
     RIO
     Tree
+    Gpad    
+    Hist
 )
 
 # define PcapPlusPlus location
@@ -32,6 +34,8 @@ target_link_libraries(SV_Reader
         ROOT::Core
         ROOT::RIO
         ROOT::Tree
+        ROOT::Gpad
+        ROOT::Hist
         ${PCAPPP_LIB_DIR}/libCommon++.a
         ${PCAPPP_LIB_DIR}/libPacket++.a
         ${PCAPPP_LIB_DIR}/libPcap++.a

@@ -5,6 +5,12 @@
 #include "TFile.h"
 #include "TTree.h"
 
+#include "TGraph.h"
+#include "TMultiGraph.h"
+#include "TCanvas.h"
+#include "TAxis.h"  
+#include "TLegend.h"
+
 #include "SJSV_pcapreader.h"
 
 INITIALIZE_EASYLOGGINGPP
@@ -37,9 +43,29 @@ class SJSV_eventbuilder
             tdc_slope = _tdc_slope;
         }
 
+        // * Parse raw data to parsed data
+        // * @return: true if success, false if failed
         bool parse_raw_data();
 
+        // * Save parsed data to rootfile
+        // * @param _filename_str: filename of rootfile
+        // * @return: true if success, false if failed
         bool save_parsed_data(const std::string &_filename_str);
+
+        // * Quick browse parsed data by channel
+        // * @param _channel: channel to be browsed
+        // * @param _start_time: start time in ns
+        // * @param _end_time: end time in ns
+        // * @return: TGraph of parsed data
+        TGraph* quick_plot_single_channel(uint16_t _channel, double _start_time, double _end_time);
+        
+        // * Quick plot of time and frame index
+        // * @param _start_time: start time in ns
+        // * @param _end_time: end time in nss
+        // * @return: TGraph of time and frame index
+        TGraph* quick_plot_time_index(double _start_time, double _end_time);
+
+        TMultiGraph* quick_plot_multiple_channels(std::vector<uint16_t> _vec_channel, double _start_time, double _end_time);
 
     private:
         inline uint16_t get_uni_channel(const SJSV_pcapreader::uni_frame &_frame) {
@@ -59,6 +85,10 @@ class SJSV_eventbuilder
             return (get_combined_corse_time_ns(_frame) + 1.5 * double(bcid_cycle) - double(tdc_slope) * double(_frame.tdc) / 255.0);
         }
 
+        // * Parse a frame
+        // * @param _frame: frame to be parsed
+        // * @param _offset_timestamp: timestamp difference from the first frame
+        // * @return: parsed_frame
         parsed_frame parse_frame(const SJSV_pcapreader::uni_frame &_frame, uint64_t _offset_timestamp);
     
     private:

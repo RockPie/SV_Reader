@@ -31,6 +31,11 @@ bool SJSV_eventbuilder::load_raw_data(const std::string &_filename_str){
         return false;
     }
 
+    if (is_parsed_data_valid) {
+        vec_frame_ptr->clear();
+        is_parsed_data_valid = false;
+    }
+
     uint8_t  _offset;
     uint8_t  _vmm_id;
     uint16_t _adc;
@@ -178,4 +183,131 @@ bool SJSV_eventbuilder::save_parsed_data(const std::string &_filename_str) {
     rootfile->Close();
 
     return true;
+}
+
+TGraph* SJSV_eventbuilder::quick_plot_single_channel(uint16_t _channel, double _start_time, double _end_time){
+    if (!is_parsed_data_valid) {
+        LOG(ERROR) << "Parsed data is not valid for browsing";
+        return nullptr;
+    }
+
+    if (vec_parsed_frame_ptr->empty()) {
+        LOG(ERROR) << "Parsed data is empty";
+        return nullptr;
+    }
+
+    auto _graph = new TGraph();
+    auto _graph_name = "graph_ch" + std::to_string(_channel);
+    _graph->SetTitle(_graph_name.c_str());
+    _graph->SetName(_graph_name.c_str());
+
+    auto _frame_num = vec_parsed_frame_ptr->size();
+    uint32_t _plot_point_cnt = 0;
+
+    for (auto i=0; i<_frame_num; i++) {
+        auto _parsed_frame = vec_parsed_frame_ptr->at(i);
+        if (_parsed_frame.uni_channel == _channel) {
+            if (_parsed_frame.time_ns >= _start_time && _parsed_frame.time_ns <= _end_time) {
+                _graph->SetPoint(_graph->GetN(), _parsed_frame.time_ns, _parsed_frame.adc);
+                _plot_point_cnt++;
+            }
+        }
+    }
+
+    // set x axis label
+    auto _xaxis = _graph->GetXaxis();
+    _xaxis->SetTitle("Time (ns)");
+
+    // set y axis label
+    auto _yaxis = _graph->GetYaxis();
+    _yaxis->SetTitle("ADC");
+
+    if (_plot_point_cnt == 0) {
+        LOG(WARNING) << "No points plotted";
+        delete _graph;
+        return nullptr;
+    } else {
+        LOG(INFO) << _plot_point_cnt << " points plotted";
+    }
+
+
+    return _graph;
+}
+
+TGraph* SJSV_eventbuilder::quick_plot_time_index(double _start_time, double _end_time){
+    if (!is_parsed_data_valid) {
+        LOG(ERROR) << "Parsed data is not valid for browsing";
+        return nullptr;
+    }
+
+    if (vec_parsed_frame_ptr->empty()) {
+        LOG(ERROR) << "Parsed data is empty";
+        return nullptr;
+    }
+
+    // LOG(DEBUG) << "Plotting time index";
+
+    auto _graph = new TGraph();
+    auto _graph_name = "graph_time_index";
+
+    _graph->SetTitle(_graph_name);
+    _graph->SetName(_graph_name);
+
+    auto _frame_num = vec_parsed_frame_ptr->size();
+    uint32_t _plot_point_cnt = 0;
+
+    for (auto i=0; i<_frame_num; i++) {
+        auto _parsed_frame = vec_parsed_frame_ptr->at(i);
+        if (_parsed_frame.time_ns >= _start_time && _parsed_frame.time_ns <= _end_time) {
+            _plot_point_cnt++;
+            // LOG(DEBUG) << "Plotting frame " << i << " at time " << _parsed_frame.time_ns;
+            _graph->SetPoint(_graph->GetN(), i, _parsed_frame.time_ns);
+        }
+    }
+
+    // set x axis label
+    auto _xaxis = _graph->GetXaxis();
+    _xaxis->SetTitle("Frame index");
+
+    // set y axis label
+    auto _yaxis = _graph->GetYaxis();
+    _yaxis->SetTitle("Time (ns)");
+
+    if (_plot_point_cnt == 0) {
+        LOG(WARNING) << "No points plotted";
+        delete _graph;
+        return nullptr;
+    } else {
+        LOG(INFO) << _plot_point_cnt << " points plotted";
+    }
+
+    return _graph;
+}
+
+TMultiGraph* SJSV_eventbuilder::quick_plot_multiple_channels(std::vector<uint16_t> _vec_channel, double _start_time, double _end_time) {
+    if (_vec_channel.empty()) {
+        LOG(ERROR) << "Channel vector is empty";
+        return nullptr;
+    }
+
+    auto _mg = new TMultiGraph();
+    auto _mg_name = "mg_ch";
+    _mg->SetTitle(_mg_name);
+
+    for (auto i=0; i<_vec_channel.size(); i++) {
+        auto _channel = _vec_channel.at(i);
+        auto _graph = quick_plot_single_channel(_channel, _start_time, _end_time);
+        
+        if (_graph == nullptr) {
+            LOG(WARNING) << "Graph for channel " << _channel << " is null";
+            auto _graph_placeholder = new TGraph();
+            _mg->Add(_graph_placeholder);
+            continue;
+        }
+        _graph->SetLineColor(i+1);
+        _graph->SetLineWidth(3);    
+        _mg->Add(_graph);
+    }
+
+    return _mg;
 }
