@@ -12,25 +12,33 @@ int main(int argc, char** argv) {
     set_easylogger();
     LOG(INFO) << "Start SJSV_rawdata.cxx";
 
-    std::string filename = "../data/traffic_2023073101.pcap";
+    std::string filename_pcap = "../data/traffic_2023073101.pcap";
 
     // split filename according to '_'
-    std::string filename_root = "../tmp/raw_" + filename.substr(filename.find_last_of("_")+1, filename.find_last_of(".")-filename.find_last_of("_")-1) + ".root";
+    std::string filename_raw_root = "../tmp/raw_" + filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1) + ".root";
+
+    std::string filename_parsed_root = "../tmp/parsed_" + filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1) + ".root";
 
     // * Test pcapreader
-    SJSV_pcapreader pcapreader(filename);
+    SJSV_pcapreader pcapreader(filename_pcap);
     pcapreader.read_pcapfile();
     pcapreader.test_decode_first_packet();
     auto vec_len = pcapreader.full_decode_pcapfile();
-    if (pcapreader.save_to_rootfile(filename_root))
+    if (pcapreader.save_to_rootfile(filename_raw_root))
         LOG(INFO) << "Save to rootfile success";
     else
         LOG(ERROR) << "Save to rootfile fail";
 
     // * Test eventbuilder
     SJSV_eventbuilder eventbuilder;
-    eventbuilder.load_raw_data(filename_root);
-
+    eventbuilder.load_raw_data(filename_raw_root);
+    eventbuilder.set_bcid_cycle(25);
+    eventbuilder.set_tdc_slope(60);
+    eventbuilder.parse_raw_data();
+    if (eventbuilder.save_parsed_data(filename_parsed_root))
+        LOG(INFO) << "Save to rootfile success";
+    else
+        LOG(ERROR) << "Save to rootfile fail";
     return 0;
 }
 
