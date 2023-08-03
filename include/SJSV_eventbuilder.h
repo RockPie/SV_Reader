@@ -10,6 +10,7 @@
 #include "TCanvas.h"
 #include "TAxis.h"  
 #include "TLegend.h"
+#include "TH1.h"
 
 #include "SJSV_pcapreader.h"
 
@@ -65,7 +66,27 @@ class SJSV_eventbuilder
         // * @return: TGraph of time and frame index
         TGraph* quick_plot_time_index(double _start_time, double _end_time);
 
+        // * Quick plot of multiple channels
+        // * @param _vec_channel: vector of channels to be plotted
+        // * @param _start_time: start time in ns
+        // * @param _end_time: end time in ns
+        // * @return: TMultiGraph of multiple channels
         TMultiGraph* quick_plot_multiple_channels(std::vector<uint16_t> _vec_channel, double _start_time, double _end_time);
+
+        TH1D* quick_plot_single_channel_hist(uint16_t _channel);
+
+        std::vector<uint16_t> get_pedestal();
+
+        inline void update_pedestal() {
+            vec_pedestal_ptr = new std::vector<uint16_t>;
+            // copy get_pedestal() to vec_pedestal_ptr
+            auto _pedestal = get_pedestal();
+            auto _pedestal_size = _pedestal.size();
+            for (uint16_t i = 0; i < _pedestal_size; i++) {
+                vec_pedestal_ptr->push_back(_pedestal[i]);
+            }
+            is_pedestal_valid = true;
+        }
 
     private:
         inline uint16_t get_uni_channel(const SJSV_pcapreader::uni_frame &_frame) {
@@ -94,11 +115,13 @@ class SJSV_eventbuilder
     private:
         bool is_raw_data_valid;
         bool is_parsed_data_valid;
+        bool is_pedestal_valid;
 
         uint8_t bcid_cycle; // in ns
         uint8_t tdc_slope;  // in ns
         std::vector<SJSV_pcapreader::uni_frame>* vec_frame_ptr;
         std::vector<parsed_frame>* vec_parsed_frame_ptr;
+        std::vector<uint16_t>* vec_pedestal_ptr;
 };
 
 

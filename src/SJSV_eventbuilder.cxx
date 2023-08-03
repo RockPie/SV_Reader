@@ -3,6 +3,7 @@
 SJSV_eventbuilder::SJSV_eventbuilder():
     is_raw_data_valid(false),
     is_parsed_data_valid(false),
+    is_pedestal_valid(false),
     bcid_cycle(25),
     tdc_slope(25) {
     vec_frame_ptr = new std::vector<SJSV_pcapreader::uni_frame>;
@@ -208,7 +209,14 @@ TGraph* SJSV_eventbuilder::quick_plot_single_channel(uint16_t _channel, double _
         auto _parsed_frame = vec_parsed_frame_ptr->at(i);
         if (_parsed_frame.uni_channel == _channel) {
             if (_parsed_frame.time_ns >= _start_time && _parsed_frame.time_ns <= _end_time) {
-                _graph->SetPoint(_graph->GetN(), _parsed_frame.time_ns, _parsed_frame.adc);
+                auto _adc_buffer = _parsed_frame.adc;
+                if (is_pedestal_valid) {
+                    if (_adc_buffer >= vec_pedestal_ptr->at(_channel))
+                        _adc_buffer -= vec_pedestal_ptr->at(_channel);
+                    else
+                        _adc_buffer = 0;
+                }
+                _graph->SetPoint(_graph->GetN(), _parsed_frame.time_ns, _adc_buffer);
                 _plot_point_cnt++;
             }
         }
@@ -310,4 +318,90 @@ TMultiGraph* SJSV_eventbuilder::quick_plot_multiple_channels(std::vector<uint16_
     }
 
     return _mg;
+}
+
+TH1D* SJSV_eventbuilder::quick_plot_single_channel_hist(uint16_t _channel) {
+    if (!is_parsed_data_valid) {
+        LOG(ERROR) << "Parsed data is not valid for browsing";
+        return nullptr;
+    }
+
+    if (vec_parsed_frame_ptr->empty()) {
+        LOG(ERROR) << "Parsed data is empty";
+        return nullptr;
+    }
+
+    auto _hist = new TH1D();
+    auto _hist_name = "hist_ch" + std::to_string(_channel);
+    _hist->SetTitle(_hist_name.c_str());
+    _hist->SetName(_hist_name.c_str());
+
+    // set bin number
+    _hist->SetBins(200, 0, 1023);
+
+    auto _frame_num = vec_parsed_frame_ptr->size();
+    uint32_t _plot_point_cnt = 0;
+
+    for (auto i=0; i<_frame_num; i++) {
+        auto _parsed_frame = vec_parsed_frame_ptr->at(i);
+        if (_parsed_frame.uni_channel == _channel) {
+            _hist->Fill(_parsed_frame.adc);
+            _plot_point_cnt++;
+        }
+    }
+
+    // normalize
+    // _hist->Scale(1.0/_hist->Integral());
+
+    if (_plot_point_cnt == 0) {
+        LOG(WARNING) << "No points plotted";
+        delete _hist;
+        return nullptr;
+    } else {
+        LOG(INFO) << _plot_point_cnt << " points plotted";
+    }
+
+    return _hist;
+}
+
+std::vector<uint16_t> SJSV_eventbuilder::get_pedestal() {
+    std::vector<uint16_t> _vec_pedestal;
+    if (!is_parsed_data_valid) {
+        LOG(ERROR) << "Parsed data is not valid for browsing";
+        return _vec_pedestal;
+    }
+    if (vec_parsed_frame_ptr->empty()) {
+        LOG(ERROR) << "Parsed data is empty";
+        return _vec_pedestal;
+    }
+
+    std::vector<std::vector<uint16_t>> _channel_adc_values;
+    auto _frame_num = vec_parsed_frame_ptr->size();
+    for (auto i=0; i<_frame_num; i++) {
+        auto _parsed_frame = vec_parsed_frame_ptr->at(i);
+        auto _channel = _parsed_frame.uni_channel;
+        auto _adc = _parsed_frame.adc;
+        if (_channel_adc_values.size() < _channel+1) {
+            _channel_adc_values.resize(_channel+1);
+        }
+        _channel_adc_values.at(_channel).push_back(_adc);
+    }
+
+    for (auto _single_channel_adc_values : _channel_adc_values) {
+        if (_single_channel_adc_values.size() <= 4) {
+            LOG(WARNING) << "Channel " << _single_channel_adc_values.at(0) << " has too few adc values";
+            _vec_pedestal.push_back(0);
+            continue;
+        }
+        // get the average of lower 30% adc values
+        std::sort(_single_channel_adc_values.begin(), _single_channel_adc_values.end());
+        auto _pedestal_value = 0;
+        for (auto i=0; i<_single_channel_adc_values.size()*0.3; i++) {
+            _pedestal_value += _single_channel_adc_values.at(i);
+        }
+        _pedestal_value /= _single_channel_adc_values.size()*0.3;
+        _vec_pedestal.push_back(_pedestal_value);
+    }
+
+    return _vec_pedestal;
 }

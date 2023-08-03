@@ -4,7 +4,6 @@
 #include "SJSV_pcapreader.h"
 #include "SJSV_eventbuilder.h"
 
-#include "TGraph.h"
 #include "TCanvas.h" 
 
 
@@ -43,7 +42,7 @@ int main(int argc, char** argv) {
     else
         LOG(ERROR) << "Save to rootfile fail";
 
-
+    eventbuilder.update_pedestal();
 
     auto qb_canvas2 = new TCanvas("qb_canvas2", "Quick browse2", 1200, 1000);
     auto qb_tgraph2 = eventbuilder.quick_plot_time_index(100'000'000, 400'000'000);
@@ -54,7 +53,7 @@ int main(int argc, char** argv) {
     auto qb_canvas = new TCanvas("qb_canvas", "Quick browse", 1200, 1000);
     // auto qb_tgraph = eventbuilder.quick_plot_single_channel(4, 50000000, 400000000);
     // auto qb_tgraph = eventbuilder.quick_plot_time_index(0, 700'000'000);
-    auto qp_channel_vec = std::vector<uint16_t>{0, 1, 2, 3, 4, 5, 6, 7, 100, 101, 120};
+    auto qp_channel_vec = std::vector<uint16_t>{16, 17, 18, 19, 20, 21, 22, 23};
     auto qb_tgraph = eventbuilder.quick_plot_multiple_channels(qp_channel_vec, 100'000'000, 400'000'000);
     qb_tgraph->Draw("APL");
     auto _legend = new TLegend(0.7, 0.7, 0.9, 0.9);
@@ -65,8 +64,41 @@ int main(int argc, char** argv) {
     qb_canvas->SaveAs("../pics/quick_browse_multichn.png");
     qb_canvas->Close();
 
-    
+    auto qp_canvas = new TCanvas("qp_canvas", "Quick plot", 1200, 1000);
+    auto qp_hist1 = eventbuilder.quick_plot_single_channel_hist(4);
+    auto qp_hist2 = eventbuilder.quick_plot_single_channel_hist(5);
+    auto qp_hist3 = eventbuilder.quick_plot_single_channel_hist(6);
+    auto qp_hist4 = eventbuilder.quick_plot_single_channel_hist(7);
 
+    qp_hist1->SetLineColor(kRed);
+    qp_hist2->SetLineColor(kBlue);
+    qp_hist3->SetLineColor(kGreen);
+    qp_hist4->SetLineColor(kBlack);
+
+    qp_hist1->SetLineWidth(2);
+    qp_hist2->SetLineWidth(2);
+    qp_hist3->SetLineWidth(2);
+    qp_hist4->SetLineWidth(2);
+
+    qp_hist1->SetBins(100, 100, 512);
+    qp_hist2->SetBins(100, 100, 512);
+    qp_hist3->SetBins(100, 100, 512);
+    qp_hist4->SetBins(100, 100, 512);
+
+    qp_hist1->Draw("");
+    qp_hist2->Draw("same");
+    qp_hist3->Draw("same");
+    qp_hist4->Draw("same");
+
+    auto _legend2 = new TLegend(0.7, 0.7, 0.9, 0.9);
+    _legend2->AddEntry(qp_hist1, "Channel 4", "l");
+    _legend2->AddEntry(qp_hist2, "Channel 5", "l");
+    _legend2->AddEntry(qp_hist3, "Channel 6", "l");
+    _legend2->AddEntry(qp_hist4, "Channel 7", "l");
+    _legend2->Draw();
+
+    qp_canvas->SaveAs("../pics/quick_plot_hist.png");
+    qp_canvas->Close();
 
     return 0;
 }
