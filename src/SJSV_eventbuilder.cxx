@@ -4,6 +4,7 @@ SJSV_eventbuilder::SJSV_eventbuilder():
     is_raw_data_valid(false),
     is_parsed_data_valid(false),
     is_pedestal_valid(false),
+    pedestal_subtraction_enabled(false),
     bcid_cycle(25),
     tdc_slope(25) {
     vec_frame_ptr = new std::vector<SJSV_pcapreader::uni_frame>;
@@ -210,11 +211,16 @@ TGraph* SJSV_eventbuilder::quick_plot_single_channel(uint16_t _channel, double _
         if (_parsed_frame.uni_channel == _channel) {
             if (_parsed_frame.time_ns >= _start_time && _parsed_frame.time_ns <= _end_time) {
                 auto _adc_buffer = _parsed_frame.adc;
-                if (is_pedestal_valid) {
-                    if (_adc_buffer >= vec_pedestal_ptr->at(_channel))
-                        _adc_buffer -= vec_pedestal_ptr->at(_channel);
-                    else
-                        _adc_buffer = 0;
+                if (pedestal_subtraction_enabled) {
+                    if (!is_pedestal_valid) {
+                        LOG(WARNING) << "Pedestal is not valid for browsing";
+                    } else {
+                        if (_adc_buffer >= vec_pedestal_ptr->at(_channel))
+                            _adc_buffer -= vec_pedestal_ptr->at(_channel);
+                        else
+                            _adc_buffer = 0;
+                    }
+                    
                 }
                 _graph->SetPoint(_graph->GetN(), _parsed_frame.time_ns, _adc_buffer);
                 _plot_point_cnt++;
@@ -364,7 +370,7 @@ TH1D* SJSV_eventbuilder::quick_plot_single_channel_hist(uint16_t _channel) {
     return _hist;
 }
 
-std::vector<uint16_t> SJSV_eventbuilder::get_pedestal() {
+std::vector<uint16_t> SJSV_eventbuilder::get_simple_pedestal() {
     std::vector<uint16_t> _vec_pedestal;
     if (!is_parsed_data_valid) {
         LOG(ERROR) << "Parsed data is not valid for browsing";
@@ -402,6 +408,49 @@ std::vector<uint16_t> SJSV_eventbuilder::get_pedestal() {
         _pedestal_value /= _single_channel_adc_values.size()*0.3;
         _vec_pedestal.push_back(_pedestal_value);
     }
+
+    return _vec_pedestal;
+}
+
+std::vector<uint16_t> SJSV_eventbuilder::load_pedestal_csv(const std::string &_filename_str) {
+    if (_filename_str.empty()) {
+        LOG(ERROR) << "Filename is empty";
+        return std::vector<uint16_t>();
+    }
+
+
+    io::CSVReader<5> _in(_filename_str.c_str());
+    _in.read_header(io::ignore_extra_column, "hybrid_id", "fec", "vmm", "ch", "pedestal [mV]");
+    std::string _hybrid_id_str;
+    std::string _fec;
+    std::string _vmm;
+    std::string _ch;
+    std::string _pedestal;
+
+    std::vector<uint16_t> _vec_pedestal;
+
+    while (_in.read_row(_hybrid_id_str, _fec, _vmm, _ch, _pedestal)) {
+        uint16_t _uni_chn = 0;
+        uint16_t _pedestal_value = 0;
+        try
+        {
+            _uni_chn = std::stoi(_ch) + std::stoi(_vmm)*64;
+            _pedestal_value = std::stoi(_pedestal);
+        }
+        catch(const std::exception& e)
+        {
+            // ! this can be caused by additional header in the csv file
+            LOG(WARNING) << "Exception caught when converting channel number to integer: " << e.what();
+            continue;
+        }
+        
+        if (_vec_pedestal.size() < _uni_chn+1) {
+            _vec_pedestal.resize(_uni_chn+1);
+        }
+        _vec_pedestal.at(_uni_chn) = _pedestal_value;
+    }
+
+    LOG(INFO) << "Pedestal loaded from " << _filename_str << " with " << _vec_pedestal.size() << " channels";
 
     return _vec_pedestal;
 }

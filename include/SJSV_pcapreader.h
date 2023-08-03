@@ -87,7 +87,11 @@ class SJSV_pcapreader {
         // * @return -1 if fail, otherwise the length of the vector
         int64_t full_decode_pcapfile();
 
+        // * Save decoded data to root file
+        // * @return true if success, false if fail
         bool save_to_rootfile(const std::string &_rootfilename);
+
+        std::string test_single_frame_decode(const std::vector<uint8_t> &_test_frame);
 
     private:
         // * Convert protocol type to string
@@ -95,6 +99,15 @@ class SJSV_pcapreader {
 
         // * Convert gray code to binary
         uint32_t Gray2bin32(uint32_t _num);
+
+        uni_frame decode_single_frame(uint8_t _byte0, uint8_t _byte1, uint8_t _byte2, uint8_t _byte3, uint8_t _byte4, uint8_t _byte5);
+        inline uni_frame decode_single_frame(const std::vector<uint8_t> &_frame) {
+            if (_frame.size() != LEN_RAW_FRAME_BYTE) {
+                LOG(ERROR) << "Frame size is not correct";
+                return uni_frame();
+            }
+            return decode_single_frame(_frame[0], _frame[1], _frame[2], _frame[3], _frame[4], _frame[5]);
+        }
 
     private:
         bool is_reader_valid;

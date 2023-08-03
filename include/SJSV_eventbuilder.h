@@ -12,7 +12,11 @@
 #include "TLegend.h"
 #include "TH1.h"
 
+#include "csv.h"
+
 #include "SJSV_pcapreader.h"
+
+#define CHN_PER_VMM 64
 
 INITIALIZE_EASYLOGGINGPP
 
@@ -73,19 +77,39 @@ class SJSV_eventbuilder
         // * @return: TMultiGraph of multiple channels
         TMultiGraph* quick_plot_multiple_channels(std::vector<uint16_t> _vec_channel, double _start_time, double _end_time);
 
+        // * Quick histogram of single channel
         TH1D* quick_plot_single_channel_hist(uint16_t _channel);
 
-        std::vector<uint16_t> get_pedestal();
+        // * Simple pedestal calculation - mean of lower 30% ADC
+        std::vector<uint16_t> get_simple_pedestal();
 
-        inline void update_pedestal() {
-            vec_pedestal_ptr = new std::vector<uint16_t>;
-            // copy get_pedestal() to vec_pedestal_ptr
-            auto _pedestal = get_pedestal();
-            auto _pedestal_size = _pedestal.size();
-            for (uint16_t i = 0; i < _pedestal_size; i++) {
-                vec_pedestal_ptr->push_back(_pedestal[i]);
+        // * Update pedestal to in-class vector
+        // * after calling this function, single channel plot will subtract pedestal automatically
+        inline void update_pedestal(const std::vector<uint16_t> &_pede_val) {
+            if (_pede_val.size() == 0) {
+                LOG(ERROR) << "Pedestal vector is empty" << std::endl;
+                return;
             }
+
+            if (is_pedestal_valid) {
+                LOG(WARNING) << "Overwriting existing pedestal";
+                is_pedestal_valid = false;
+                vec_parsed_frame_ptr->clear();
+            }
+            
+            this->vec_pedestal_ptr = new std::vector<uint16_t>(_pede_val);
             is_pedestal_valid = true;
+
+            LOG(INFO) << "Pedestal updated";
+            return;
+        }
+
+        std::vector<uint16_t>  load_pedestal_csv(const std::string &_filename_str);
+
+        inline void enable_pedestal_subtraction(bool _enable = true) {
+            if (_enable == pedestal_subtraction_enabled)
+                LOG(WARNING) << "Pedestal subtraction is already " << (_enable ? "enabled" : "disabled") << std::endl;
+            pedestal_subtraction_enabled = _enable;
         }
 
     private:
@@ -97,7 +121,6 @@ class SJSV_eventbuilder
             return (_frame.offset << 12) + _frame.bcid;
         }
 
-        // todo: check if 32 bit is enough
         inline double get_combined_corse_time_ns(const SJSV_pcapreader::uni_frame &_frame) {
             return double(get_combined_corse_time(_frame)) * double(bcid_cycle);
         }
@@ -116,6 +139,7 @@ class SJSV_eventbuilder
         bool is_raw_data_valid;
         bool is_parsed_data_valid;
         bool is_pedestal_valid;
+        bool pedestal_subtraction_enabled;
 
         uint8_t bcid_cycle; // in ns
         uint8_t tdc_slope;  // in ns

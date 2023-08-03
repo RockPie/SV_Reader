@@ -23,6 +23,10 @@ int main(int argc, char** argv) {
 
     // * Test pcapreader
     SJSV_pcapreader pcapreader(filename_pcap);
+    // * Run a single frame test
+    // std::vector<uint8_t> frame = std::vector<uint8_t>{0x53, 0x70, 0x21, 0xdf, 0xd8, 0x62};
+    // auto res_str = pcapreader.test_single_frame_decode(frame);
+    // LOG(INFO) << "Single frame decode result: " << res_str;
     pcapreader.read_pcapfile();
     pcapreader.test_decode_first_packet();
     auto vec_len = pcapreader.full_decode_pcapfile();
@@ -42,7 +46,9 @@ int main(int argc, char** argv) {
     else
         LOG(ERROR) << "Save to rootfile fail";
 
-    eventbuilder.update_pedestal();
+    auto _temp_pedestal = eventbuilder.load_pedestal_csv("../data/config/Pedestal_143915.csv");
+    eventbuilder.update_pedestal(_temp_pedestal);
+    eventbuilder.enable_pedestal_subtraction(true);
 
     auto qb_canvas2 = new TCanvas("qb_canvas2", "Quick browse2", 1200, 1000);
     auto qb_tgraph2 = eventbuilder.quick_plot_time_index(100'000'000, 400'000'000);

@@ -197,32 +197,7 @@ std::vector<SJSV_pcapreader::uni_frame> SJSV_pcapreader::decode_pcap_packet(cons
     // LOG(DEBUG) << "Payload length: " << _payload_len;
 
     for (int i = LEN_RAW_HEADER_BYTE; i < _payload_len; i += LEN_RAW_FRAME_BYTE) {
-        uni_frame _frame;
-        uint32_t _data1 = _payload[i] << 24 | _payload[i+1] << 16 | _payload[i+2] << 8 | _payload[i+3];
-        uint16_t _data2 = _payload[i+4] << 8 | _payload[i+5];
-
-        _frame.flag_daq = (_data2 >> 15) & 0x1;
-        if (_frame.flag_daq) {
-            _frame.offset    = (_data1 >> 27) & 0x1F;
-            _frame.vmm_id    = (_data1 >> 22) & 0x1F;
-            _frame.adc       = (_data1 >> 12) & 0x3FF;
-            _frame.bcid      = Gray2bin32(_data1 & 0xFFF);
-            _frame.daqdata38 = (_data2 >> 14) & 0x1;
-            _frame.channel   = (_data2 >> 8) & 0x3f;
-            _frame.tdc       = _data2 & 0xFF;
-            _frame.timestamp = 0;
-        } else {
-            _frame.offset    = 0;
-            _frame.vmm_id    = 0;
-            _frame.adc       = 0;
-            _frame.bcid      = 0;
-            _frame.daqdata38 = 0;
-            _frame.channel   = 0;
-            _frame.tdc       = 0;
-            uint64_t timestamp_lower_10bit = _data2 & 0x03FF;
-            uint64_t timestamp_upper_32bit = _data1;
-            _frame.timestamp = (timestamp_upper_32bit << 10) + timestamp_lower_10bit;
-        }
+        auto _frame = decode_single_frame(_payload[i], _payload[i + 1], _payload[i + 2], _payload[i + 3], _payload[i + 4], _payload[i + 5]);
         _frame_array.push_back(_frame);
     }
 
@@ -337,4 +312,52 @@ bool SJSV_pcapreader::save_to_rootfile(const std::string &_rootfilename) {
     _rootfile->Close();
 
     return true;
+}
+
+std::string SJSV_pcapreader::test_single_frame_decode(const std::vector<uint8_t> &_test_frame) {
+    auto _frame = this->decode_single_frame(_test_frame);
+
+    std::string _str = "";
+    _str += "offset:    " + std::to_string(_frame.offset) + "\n";
+    _str += "vmm_id:    " + std::to_string(_frame.vmm_id) + "\n";
+    _str += "adc:       " + std::to_string(_frame.adc) + "\n";
+    _str += "bcid:      " + std::to_string(_frame.bcid) + "\n";
+    _str += "daqdata38: " + std::to_string(_frame.daqdata38) + "\n";
+    _str += "channel:   " + std::to_string(_frame.channel) + "\n";
+    _str += "tdc:       " + std::to_string(_frame.tdc) + "\n";
+    _str += "timestamp: " + std::to_string(_frame.timestamp) + "\n";
+    _str += "flag_daq:  " + std::to_string(_frame.flag_daq) + "\n";
+
+    return _str;
+}
+
+SJSV_pcapreader::uni_frame SJSV_pcapreader::decode_single_frame(uint8_t _byte0, uint8_t _byte1, uint8_t _byte2, uint8_t _byte3, uint8_t _byte4, uint8_t _byte5) {
+    uni_frame _frame;
+    uint32_t _data1 = (_byte0 << 24) + (_byte1 << 16) + (_byte2 << 8) + _byte3;
+    uint16_t _data2 = (_byte4 << 8) + _byte5;
+
+    _frame.flag_daq = (_data2 >> 15) & 0x1;
+        if (_frame.flag_daq) {
+            _frame.offset    = (_data1 >> 27) & 0x1F;
+            _frame.vmm_id    = (_data1 >> 22) & 0x1F;
+            _frame.adc       = (_data1 >> 12) & 0x3FF;
+            _frame.bcid      = Gray2bin32(_data1 & 0xFFF);
+            _frame.daqdata38 = (_data2 >> 14) & 0x1;
+            _frame.channel   = (_data2 >> 8) & 0x3f;
+            _frame.tdc       = _data2 & 0xFF;
+            _frame.timestamp = 0;
+        } else {
+            _frame.offset    = 0;
+            _frame.vmm_id    = 0;
+            _frame.adc       = 0;
+            _frame.bcid      = 0;
+            _frame.daqdata38 = 0;
+            _frame.channel   = 0;
+            _frame.tdc       = 0;
+            uint64_t timestamp_lower_10bit = _data2 & 0x03FF;
+            uint64_t timestamp_upper_32bit = _data1;
+            _frame.timestamp = (timestamp_upper_32bit << 10) + timestamp_lower_10bit;
+        }
+
+    return _frame;
 }
