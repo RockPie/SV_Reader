@@ -262,10 +262,12 @@ TGraph* SJSV_eventbuilder::quick_plot_time_index(double _start_time, double _end
     // LOG(DEBUG) << "Plotting time index";
 
     auto _graph = new TGraph();
-    auto _graph_name = "graph_time_index";
+    auto _graph_name = "reconstucted time vs frame index";
 
     _graph->SetTitle(_graph_name);
     _graph->SetName(_graph_name);
+    // add grid
+    _graph->SetLineWidth(2);
 
     auto _frame_num = vec_parsed_frame_ptr->size();
     uint32_t _plot_point_cnt = 0;
@@ -305,8 +307,14 @@ TMultiGraph* SJSV_eventbuilder::quick_plot_multiple_channels(std::vector<uint16_
     }
 
     auto _mg = new TMultiGraph();
-    auto _mg_name = "mg_ch";
+    auto _mg_name = "multichannel ADCs";
     _mg->SetTitle(_mg_name);
+
+    // auto _xaxis = _mg->GetXaxis();
+    // _xaxis->SetTitle("Time (ns)");
+
+    // auto _yaxis = _mg->GetYaxis();
+    // _yaxis->SetTitle("ADC");
 
     for (auto i=0; i<_vec_channel.size(); i++) {
         auto _channel = _vec_channel.at(i);
@@ -322,6 +330,11 @@ TMultiGraph* SJSV_eventbuilder::quick_plot_multiple_channels(std::vector<uint16_
         _graph->SetLineWidth(3);    
         _mg->Add(_graph);
     }
+    auto _xaxis = _mg->GetXaxis();
+    _xaxis->SetTitle("Time (ns)");
+
+    auto _yaxis = _mg->GetYaxis();
+    _yaxis->SetTitle("ADC");
 
     return _mg;
 }
@@ -380,7 +393,6 @@ std::vector<uint16_t> SJSV_eventbuilder::get_simple_pedestal() {
         LOG(ERROR) << "Parsed data is empty";
         return _vec_pedestal;
     }
-
     std::vector<std::vector<uint16_t>> _channel_adc_values;
     auto _frame_num = vec_parsed_frame_ptr->size();
     for (auto i=0; i<_frame_num; i++) {
@@ -395,7 +407,7 @@ std::vector<uint16_t> SJSV_eventbuilder::get_simple_pedestal() {
 
     for (auto _single_channel_adc_values : _channel_adc_values) {
         if (_single_channel_adc_values.size() <= 4) {
-            LOG(WARNING) << "Channel " << _single_channel_adc_values.at(0) << " has too few adc values";
+            LOG(WARNING) << "Channel has too few adc values";
             _vec_pedestal.push_back(0);
             continue;
         }
