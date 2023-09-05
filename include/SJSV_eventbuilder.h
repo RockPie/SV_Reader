@@ -78,7 +78,7 @@ class SJSV_eventbuilder
         TMultiGraph* quick_plot_multiple_channels(std::vector<uint16_t> _vec_channel, double _start_time, double _end_time);
 
         // * Quick histogram of single channel
-        TH1D* quick_plot_single_channel_hist(uint16_t _channel);
+        TH1D* quick_plot_single_channel_hist(uint16_t _channel, Int_t _bin_num, Double_t _bin_low, Double_t _bin_high);
 
         // * Simple pedestal calculation - mean of lower 30% ADC
         std::vector<uint16_t> get_simple_pedestal();

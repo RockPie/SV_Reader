@@ -339,7 +339,7 @@ TMultiGraph* SJSV_eventbuilder::quick_plot_multiple_channels(std::vector<uint16_
     return _mg;
 }
 
-TH1D* SJSV_eventbuilder::quick_plot_single_channel_hist(uint16_t _channel) {
+TH1D* SJSV_eventbuilder::quick_plot_single_channel_hist(uint16_t _channel, Int_t _bin_num, Double_t _bin_low, Double_t _bin_high) {
     if (!is_parsed_data_valid) {
         LOG(ERROR) << "Parsed data is not valid for browsing";
         return nullptr;
@@ -356,7 +356,7 @@ TH1D* SJSV_eventbuilder::quick_plot_single_channel_hist(uint16_t _channel) {
     _hist->SetName(_hist_name.c_str());
 
     // set bin number
-    _hist->SetBins(200, 0, 1023);
+    _hist->SetBins(_bin_num, _bin_low, _bin_high);
 
     auto _frame_num = vec_parsed_frame_ptr->size();
     uint32_t _plot_point_cnt = 0;

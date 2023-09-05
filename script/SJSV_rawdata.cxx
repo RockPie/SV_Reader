@@ -80,38 +80,56 @@ int main(int argc, char** argv) {
     qb_canvas->SaveAs("../pics/quick_browse_multichn.png");
     qb_canvas->Close();
 
+
+    Int_t bin_num = 50;
+    Double_t bin_low = 200;
+    Double_t bin_high = 350;
     auto qp_canvas = new TCanvas("qp_canvas", "Quick plot", 1200, 1000);
-    auto qp_hist1 = eventbuilder.quick_plot_single_channel_hist(74);
-    auto qp_hist2 = eventbuilder.quick_plot_single_channel_hist(75);
-    auto qp_hist3 = eventbuilder.quick_plot_single_channel_hist(76);
-    auto qp_hist4 = eventbuilder.quick_plot_single_channel_hist(77);
+    auto qp_hist1 = eventbuilder.quick_plot_single_channel_hist(74, bin_num, bin_low, bin_high);
+    auto qp_hist2 = eventbuilder.quick_plot_single_channel_hist(75, bin_num, bin_low, bin_high);
+    auto qp_hist3 = eventbuilder.quick_plot_single_channel_hist(76, bin_num, bin_low, bin_high);
+    auto qp_hist4 = eventbuilder.quick_plot_single_channel_hist(77, bin_num, bin_low, bin_high);
+    auto qp_hist5 = eventbuilder.quick_plot_single_channel_hist(78, bin_num, bin_low, bin_high);
+    auto qp_hist6 = eventbuilder.quick_plot_single_channel_hist(79, bin_num, bin_low, bin_high);
 
     qp_hist1->SetLineColor(kRed);
     qp_hist2->SetLineColor(kBlue);
     qp_hist3->SetLineColor(kGreen);
     qp_hist4->SetLineColor(kBlack);
+    qp_hist5->SetLineColor(kOrange);
+    qp_hist6->SetLineColor(kMagenta);
 
     qp_hist1->SetLineWidth(2);
     qp_hist2->SetLineWidth(2);
     qp_hist3->SetLineWidth(2);
     qp_hist4->SetLineWidth(2);
+    qp_hist5->SetLineWidth(2);
+    qp_hist6->SetLineWidth(2);
 
-    qp_hist1->SetBins(100, 100, 512);
-    qp_hist2->SetBins(100, 100, 512);
-    qp_hist3->SetBins(100, 100, 512);
-    qp_hist4->SetBins(100, 100, 512);
+    qp_hist1->SetStats(0);
+    qp_hist2->SetStats(0);
+    qp_hist3->SetStats(0);
+    qp_hist4->SetStats(0);
+    qp_hist5->SetStats(0);
+    qp_hist6->SetStats(0);
 
     qp_hist1->Draw("");
     qp_hist2->Draw("same");
     qp_hist3->Draw("same");
     qp_hist4->Draw("same");
+    qp_hist5->Draw("same");
 
     auto _legend2 = new TLegend(0.7, 0.7, 0.9, 0.9);
     _legend2->AddEntry(qp_hist1, "Channel 74", "l");
     _legend2->AddEntry(qp_hist2, "Channel 75", "l");
     _legend2->AddEntry(qp_hist3, "Channel 76", "l");
     _legend2->AddEntry(qp_hist4, "Channel 77", "l");
+    _legend2->AddEntry(qp_hist5, "Channel 78", "l");
+    _legend2->AddEntry(qp_hist6, "Channel 79", "l");
     _legend2->Draw();
+
+    // Set log scale
+    qp_canvas->SetLogy();
 
     qp_canvas->SaveAs("../pics/quick_plot_hist.png");
     qp_canvas->Close();
