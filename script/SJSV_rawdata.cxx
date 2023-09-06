@@ -9,21 +9,20 @@ void set_easylogger(); // set easylogging++ configurations
 int main(int argc, char** argv) {
     START_EASYLOGGINGPP(argc, argv);
     set_easylogger();
-    LOG(INFO) << "Start SJSV_rawdata.cxx";
 
     std::string filename_pcap = "../data/traffic_2023082102.pcap";
+    auto bcid_cycle     = uint8_t(25);
+    auto tdc_slope      = uint8_t(60);
     auto AOI_Start      =  10'000'000;
     auto AOI_End        = 200'000'000;
-    auto qp_channel_vec_adc  = std::vector<uint16_t>{64, 65, 66, 67, 68, 69, 70, 71};
     Int_t bin_num       = 50;
     Double_t bin_low    = 200;
     Double_t bin_high   = 350;
+    auto qp_channel_vec_adc  = std::vector<uint16_t>{64, 65, 66, 67, 68, 69, 70, 71};
     auto qp_channel_vec_hist = std::vector<uint16_t>{74, 75, 76, 77, 78, 79};
-    auto color_list     = std::vector<Color_t>{kRed, kBlue, kGreen, kBlack, kOrange, kMagenta};
 
     // split filename according to '_'
     std::string filename_raw_root = "../tmp/raw_" + filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1) + ".root";
-
     std::string filename_parsed_root = "../tmp/parsed_" + filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1) + ".root";
 
     // ! Create PCAP reader and read PCAP file into raw rootfile
@@ -43,8 +42,8 @@ int main(int argc, char** argv) {
     // * -------------------------------------------------------------------------------------------
     SJSV_eventbuilder eventbuilder;
     eventbuilder.load_raw_data(filename_raw_root);
-    eventbuilder.set_bcid_cycle(25);
-    eventbuilder.set_tdc_slope(60);
+    eventbuilder.set_bcid_cycle(bcid_cycle);
+    eventbuilder.set_tdc_slope(tdc_slope);
     eventbuilder.parse_raw_data();
     LOG(INFO) << "Saving to parsed rootfile ...";
     if (eventbuilder.save_parsed_data(filename_parsed_root))
@@ -52,14 +51,14 @@ int main(int argc, char** argv) {
     else
         LOG(ERROR) << "Save to rootfile fail";
     // * -------------------------------------------------------------------------------------------
-
-    // * -- Plot reconstructed time --
+    
     auto _temp_pedestal = eventbuilder.load_pedestal_csv("../data/config/Pedestal_153653.csv");
     auto _temp_simple_pedestal = eventbuilder.get_simple_pedestal();
     eventbuilder.update_pedestal(_temp_simple_pedestal);
     // eventbuilder.enable_pedestal_subtraction(true);
 
-    auto qb_canvas_time_index = new TCanvas("qb_canvas2", "Quick browse2", 1200, 1000);
+    // * -- Plot reconstructed time --
+    auto qb_canvas_time_index = new TCanvas("qb_canvas_time_index", "Quick browse time", 1200, 1000);
     auto qb_tgraph2 = eventbuilder.quick_plot_time_index(AOI_Start, AOI_End);
     qb_tgraph2->Draw("APL");
  
@@ -90,7 +89,7 @@ int main(int argc, char** argv) {
     }
 
     for (auto i = 0; i < qp_channel_vec_hist.size(); i++){
-        _vec_hist.at(i)->SetLineColor(color_list.at(i));
+        _vec_hist.at(i)->SetLineColor(i+1);
         _vec_hist.at(i)->SetLineWidth(2);
         _vec_hist.at(i)->SetStats(0);
         _vec_hist.at(i)->GetXaxis()->SetTitle("ADC");
@@ -107,9 +106,7 @@ int main(int argc, char** argv) {
     qp_canvas_multi_ADC_hist->SaveAs("../pics/quick_plot_hist.png");
     qp_canvas_multi_ADC_hist->Close();
 
-    for (auto _hist : _vec_hist)
-        delete _hist;
-
+    for (auto _hist : _vec_hist) delete _hist;
     return 0;
 }
 
