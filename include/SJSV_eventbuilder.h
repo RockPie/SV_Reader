@@ -28,6 +28,21 @@ class SJSV_eventbuilder
             double      time_ns;
             uint16_t    adc;
         };
+
+        struct raw_mapping_info {
+            std::vector<Short_t> board_num_array;
+            std::vector<Short_t> channel_num_array;
+            std::vector<Short_t> module_num_array;
+            std::vector<Short_t> col_array;
+            std::vector<Short_t> row_array;
+        };
+
+        struct channel_mapping_info {
+            std::vector<Short_t> uni_channel_array;
+            std::vector<Double_t> x_coords_array;
+            std::vector<Double_t> y_coords_array;
+            std::vector<Double_t> cell_size_array;
+        };
         
     public:
         SJSV_eventbuilder();
@@ -37,6 +52,16 @@ class SJSV_eventbuilder
         // * @param _filename_str: filename of rootfile
         // * @return: true if success, false if failed
         bool load_raw_data(const std::string &_filename_str);
+
+        // * Load mapping from csv file
+        // * @param _filename_str: filename of csv file
+        // * @return: vector of vector of the file
+        raw_mapping_info read_mapping_csv_file(const std::string &_filename_str);
+
+        channel_mapping_info generate_mapping_coordinates(
+            const raw_mapping_info &_raw_mapping_info);
+
+        bool load_mapping_file(const std::string &_filename_str);
 
         // * Set cycle time of BCID in ns
         inline void set_bcid_cycle(uint8_t _bcid_cycle) {
@@ -146,6 +171,8 @@ class SJSV_eventbuilder
         std::vector<SJSV_pcapreader::uni_frame>* vec_frame_ptr;
         std::vector<parsed_frame>* vec_parsed_frame_ptr;
         std::vector<uint16_t>* vec_pedestal_ptr;
+
+        channel_mapping_info* mapping_info_ptr;
 };
 
 

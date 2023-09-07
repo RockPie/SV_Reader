@@ -8,7 +8,7 @@
   - [Pcap Reader -- `SJSV_pcapreader.cpp/h`](#pcap-reader----sjsv_pcapreadercpph)
   - [Event Builder -- `SJSV_eventbuilder.cpp/h`](#event-builder----sjsv_eventbuildercpph)
     - [a. Data parsing](#a-data-parsing)
-    - [b. Event building](#b-event-building)
+    - [b. Mapping](#b-mapping)
     - [c. Quick plotting](#c-quick-plotting)
 
 
@@ -40,16 +40,23 @@ Because the raw data contains timing information from different sources, the fir
 
 ![Event Builder](docs/SV_Reader_Structure_event.png)
 
-### b. Event building
+### b. Mapping
 
-!!! info
-    To be done.
+To use the mapping functions, the mapping file must be provided. The mapping file is a csv file with the following structure:
+
+<img src="docs/mapping_csv_example.png" width=500x>
+
+Here the `Board Num` stands for the index of readout board/module. The `Channel Num` is the index of channels in one board/module. `Module Num` is the FoCal-H module number, ranging from 0 to 8. `Col` and `Row` are the column and row index in a FoCal-H module.
+
+Here is how the `Module Num`, `Col` and `Row` are defined:
+
+<img src="docs/MappingFigures.FullScale.png" width=400x>
 
 ### c. Quick plotting
 
 To help with the testing, serval plotting functions are implemented.
 
-<img src="docs/quick_browse_multichn_example.png" width=400x> <img src="docs/quick_browse_time_example.png" width=400x>
+<img src="docs/quick_browse_multichn_example.png" width=320x> <img src="docs/quick_browse_time_example.png" width=320x>
 
 - Single channel ADC plot - `quick_plot_single_channel`
 - Multiple channel ADC plot - `quick_plot_multiple_channels`

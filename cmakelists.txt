@@ -45,7 +45,6 @@ target_link_libraries(SV_Reader
 target_include_directories(SV_Reader
     PUBLIC
         ${PCAPPP_INCLUDE_DIR}
-
 )
 
 add_executable(raw_data_processing      ${CMAKE_CURRENT_SOURCE_DIR}/script/SJSV_rawdata.cxx)

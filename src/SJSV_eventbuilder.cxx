@@ -14,6 +14,15 @@ SJSV_eventbuilder::~SJSV_eventbuilder() {
     if (vec_frame_ptr != nullptr) {
         delete vec_frame_ptr;
     }
+    if (vec_parsed_frame_ptr != nullptr) {
+        delete vec_parsed_frame_ptr;
+    }
+    if (vec_pedestal_ptr != nullptr) {
+        delete vec_pedestal_ptr;
+    }
+    if (mapping_info_ptr != nullptr) {
+        delete mapping_info_ptr;
+    }
 }
 
 bool SJSV_eventbuilder::load_raw_data(const std::string &_filename_str){
@@ -430,7 +439,6 @@ std::vector<uint16_t> SJSV_eventbuilder::load_pedestal_csv(const std::string &_f
         return std::vector<uint16_t>();
     }
 
-
     io::CSVReader<5> _in(_filename_str.c_str());
     _in.read_header(io::ignore_extra_column, "hybrid_id", "fec", "vmm", "ch", "pedestal [mV]");
     std::string _hybrid_id_str;
@@ -465,4 +473,135 @@ std::vector<uint16_t> SJSV_eventbuilder::load_pedestal_csv(const std::string &_f
     LOG(INFO) << "Pedestal loaded from " << _filename_str << " with " << _vec_pedestal.size() << " channels";
 
     return _vec_pedestal;
+}
+
+SJSV_eventbuilder::raw_mapping_info SJSV_eventbuilder::read_mapping_csv_file(const  std::string &_filename_str){
+    LOG(INFO) << "Reading mapping file: " << _filename_str;
+    auto _res = SJSV_eventbuilder::raw_mapping_info();
+
+    if (!std::filesystem::exists(_filename_str)) {
+        LOG(ERROR) << "File not found: " << _filename_str;
+        return _res;
+    }
+
+    std::vector<std::vector<Short_t>> _mapping_array_res;
+    io::CSVReader <5> in(_filename_str.c_str());
+    in.read_header(io::ignore_extra_column, "BoardNum", "ChannelNum", "ModuleNum", "Col", "Row");
+    Short_t _board_num, _channel_num, _module_num, _col, _row;
+    std::vector<Short_t> _board_num_array, _channel_num_array, _module_num_array, _col_array, _row_array;
+    while (in.read_row(_board_num, _channel_num, _module_num, _col, _row)) {
+        _res.board_num_array.push_back(_board_num);
+        _res.channel_num_array.push_back(_channel_num);
+        _res.module_num_array.push_back(_module_num);
+        _res.col_array.push_back(_col);
+        _res.row_array.push_back(_row);
+    }
+    return _res;
+}
+
+// * Assuming the central module has 7x7 of 5x5 pads
+// * Others are 5x5 of 7x7 pads
+SJSV_eventbuilder::channel_mapping_info SJSV_eventbuilder::generate_mapping_coordinates(
+    const raw_mapping_info &_raw_mapping_info){
+
+    auto _res = SJSV_eventbuilder::channel_mapping_info();
+    
+    auto _array_size = _raw_mapping_info.board_num_array.size();
+    if (_array_size == 0){
+        LOG(ERROR) << "Mapping array size is 0";
+        return _res;
+    }
+    if (_array_size != _raw_mapping_info.channel_num_array.size() ||
+        _array_size != _raw_mapping_info.module_num_array.size() ||
+        _array_size != _raw_mapping_info.col_array.size() ||
+        _array_size != _raw_mapping_info.row_array.size()) {
+        LOG(ERROR) << "Mapping array size not match";
+        return _res;
+    }
+
+    // * Step 1. generate one-dimensional channel num
+    for (auto i = 0; i < _array_size; i++)
+        _res.uni_channel_array.push_back(_raw_mapping_info.board_num_array.at(i) * 64 + _raw_mapping_info.channel_num_array.at(i));
+
+    // * Step 2. generate x and y coordinate
+    for (auto i = 0; i < _array_size; i++) {
+        Double_t _x_base = 0;
+        Double_t _y_base = 0;
+        switch (_raw_mapping_info.module_num_array.at(i))
+        {
+        case 0:{
+            _x_base = 3;
+            _y_base = 101;
+            break;
+        }
+        case 1:{
+            _x_base = 38;
+            _y_base = 101;
+            break;
+        }
+        case 2:{
+            _x_base = 73;
+            _y_base = 101;
+            break;
+        }
+        case 3:{
+            _x_base = 3;
+            _y_base = 66;
+            break;
+        }
+        case 4:{
+            _x_base = 37;
+            _y_base = 67;
+            break;
+        }
+        case 5:{
+            _x_base = 73;
+            _y_base = 66;
+            break;
+        }
+        case 6:{
+            _x_base = 3;
+            _y_base = 31;
+            break;
+        }
+        case 7:{
+            _x_base = 38;
+            _y_base = 31;
+            break;
+        }
+        case 8:{
+            _x_base = 73;
+            _y_base = 31;
+            break;
+        }
+        default:
+            LOG(ERROR) << "Mapping module number error: " << _raw_mapping_info.module_num_array.at(i);
+            break;
+        }
+        // * Central module
+        if (_raw_mapping_info.module_num_array.at(i) == 4){
+            _res.x_coords_array.push_back(_x_base + _raw_mapping_info.col_array.at(i) * 5);
+            _res.y_coords_array.push_back(_y_base - _raw_mapping_info.row_array.at(i) * 5);
+            _res.cell_size_array.push_back(5);
+        }
+        // * Other modules
+        else {
+            _res.x_coords_array.push_back(_x_base + _raw_mapping_info.col_array.at(i) * 7);
+            _res.y_coords_array.push_back(_y_base - _raw_mapping_info.row_array.at(i) * 7);
+            _res.cell_size_array.push_back(7);
+        }
+    }
+    return _res;
+}
+
+bool SJSV_eventbuilder::load_mapping_file(const std::string &_filename_str){
+    auto _raw_mapping_info = this->read_mapping_csv_file(_filename_str);
+    auto _channel_mapping_info = this->generate_mapping_coordinates(_raw_mapping_info);
+    if (_channel_mapping_info.uni_channel_array.empty()) {
+        LOG(ERROR) << "Channel mapping info is empty";
+        return false;
+    }
+    this->mapping_info_ptr = new channel_mapping_info(_channel_mapping_info);
+    LOG(INFO) << "Loaded mapping file: " << _filename_str;
+    return true;
 }

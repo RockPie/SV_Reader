@@ -6,6 +6,7 @@
 
 void set_easylogger(); // set easylogging++ configurations
 
+
 int main(int argc, char** argv) {
     START_EASYLOGGINGPP(argc, argv);
     set_easylogger();
@@ -24,6 +25,7 @@ int main(int argc, char** argv) {
     // split filename according to '_'
     std::string filename_raw_root = "../tmp/raw_" + filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1) + ".root";
     std::string filename_parsed_root = "../tmp/parsed_" + filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1) + ".root";
+    std::string filename_mapping_csv = "../data/config/Mapping_tb2023SPS.csv";
 
     // ! Create PCAP reader and read PCAP file into raw rootfile
     // * -------------------------------------------------------------------------------------------
@@ -41,6 +43,7 @@ int main(int argc, char** argv) {
     // ! Create event builder and read raw rootfile into parsed rootfile
     // * -------------------------------------------------------------------------------------------
     SJSV_eventbuilder eventbuilder;
+    eventbuilder.load_mapping_file(filename_mapping_csv);
     eventbuilder.load_raw_data(filename_raw_root);
     eventbuilder.set_bcid_cycle(bcid_cycle);
     eventbuilder.set_tdc_slope(tdc_slope);
