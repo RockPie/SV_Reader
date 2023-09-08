@@ -29,6 +29,7 @@ class SJSV_eventbuilder
             uint16_t    uni_channel;
             double      time_ns;
             uint16_t    adc;
+            uint32_t    event_id = 0;
         };
 
         struct parsed_event {
@@ -144,6 +145,8 @@ class SJSV_eventbuilder
         TH1D* quick_plot_single_channel_hist(uint16_t _channel, Int_t _bin_num, Double_t _bin_low, Double_t _bin_high);
 
         TH2D* quick_plot_mapped_event(const mapped_event &_mapped_event, Double_t _max_adc = -1);
+
+        TH2D* quick_plot_mapped_events_sum(void);
 
         TH2D* quick_plot_multiple_channels_hist(std::vector<uint16_t> _vec_channel, Int_t _bin_num, Double_t _bin_low, Double_t _bin_high);
 

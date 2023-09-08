@@ -184,16 +184,19 @@ bool SJSV_eventbuilder::save_parsed_data(const std::string &_filename_str) {
     uint16_t uni_channel;
     double time_ns;
     uint16_t adc;
+    uint32_t event_id;
 
     tree->Branch("uni_channel", &uni_channel, "uni_channel/I");
     tree->Branch("time_ns", &time_ns, "time_ns/D");
     tree->Branch("adc", &adc, "adc/I");
+    tree->Branch("event_id", &event_id, "event_id/I");
 
     for (auto i=0; i<vec_parsed_frame_ptr->size(); i++) {
         auto _parsed_frame = vec_parsed_frame_ptr->at(i);
         uni_channel = _parsed_frame.uni_channel;
         time_ns = _parsed_frame.time_ns;
         adc = _parsed_frame.adc;
+        event_id = _parsed_frame.event_id;
         tree->Fill();
     }
 
@@ -701,6 +704,9 @@ TH2D* SJSV_eventbuilder::quick_plot_mapped_event(const mapped_event &_mapped_eve
 
     _hist->SetBins(_x_bin_num, _x_bin_low, _x_bin_high, _y_bin_num, _y_bin_low, _y_bin_high);
 
+    _hist->GetXaxis()->SetRangeUser(0, 104);
+    _hist->GetYaxis()->SetRangeUser(0, 104);
+
     if (_max_adc > 0) {
         _hist->SetMaximum(_max_adc);
     }
@@ -776,7 +782,7 @@ bool SJSV_eventbuilder::reconstruct_event(Double_t _threshold_time_ns){
     }
 
     auto _last_frame_time = vec_parsed_frame_ptr->at(0).time_ns;
-    uint32_t _current_event_id = 0;
+    uint32_t _current_event_id = 1;
     std::vector<parsed_frame*> _candidate_frames;
     for (auto _frame_index=0; _frame_index<_parsed_frame_num; _frame_index++){
         auto _parsed_frame = vec_parsed_frame_ptr->at(_frame_index);
@@ -790,6 +796,7 @@ bool SJSV_eventbuilder::reconstruct_event(Double_t _threshold_time_ns){
                 std::vector<uint16_t> _vec_channel;
                 for (auto _frame_ptr : _candidate_frames) {
                     _vec_channel.push_back(_frame_ptr->uni_channel);
+                    _frame_ptr->event_id = _current_event_id;
                 }
                 std::sort(_vec_channel.begin(), _vec_channel.end());
                 auto _it = std::unique(_vec_channel.begin(), _vec_channel.end());
@@ -852,3 +859,47 @@ TH1D* SJSV_eventbuilder::quick_plot_event_adc_hist(Int_t _bin_num, Double_t _bin
     _hist->GetYaxis()->SetTitle("Event number");
     return _hist;
 }
+
+TH2D* SJSV_eventbuilder::quick_plot_mapped_events_sum(void){
+    std::vector<uint16_t> _vec_channel;
+    for (auto _parsed_frame : *vec_parsed_frame_ptr) {
+        _vec_channel.push_back(_parsed_frame.uni_channel);
+    }
+    std::sort(_vec_channel.begin(), _vec_channel.end());
+    auto _it = std::unique(_vec_channel.begin(), _vec_channel.end());
+    _vec_channel.erase(_it, _vec_channel.end());
+
+    // create a summed event
+    parsed_event _summed_event;
+    for (auto _chn: _vec_channel){
+        parsed_frame* _parsed_frame = new parsed_frame();
+        _parsed_frame->uni_channel = _chn;
+        _parsed_frame->adc = 0;
+        _parsed_frame->time_ns = 0;
+        _parsed_frame->event_id = 0;
+        _summed_event.frames_ptr.push_back(_parsed_frame);
+    }
+
+    for (auto _parsed_frame : *vec_parsed_frame_ptr) {
+        auto _uni_channel = _parsed_frame.uni_channel;
+        auto _adc = _parsed_frame.adc;
+        for (auto _frame_ptr : _summed_event.frames_ptr) {
+            if (_frame_ptr->uni_channel == _uni_channel) {
+                _frame_ptr->adc += _adc;
+            }
+        }
+    }
+
+    auto max_adc_sum = 0;
+    for (auto _frame_ptr : _summed_event.frames_ptr) {
+        if (_frame_ptr->adc > max_adc_sum) {
+            max_adc_sum = _frame_ptr->adc;
+        }
+    }
+
+    LOG(INFO) << "Max ADC sum: " << max_adc_sum;
+
+    auto _mapped_event = map_event(_summed_event, *mapping_info_ptr);
+
+    return quick_plot_mapped_event(_mapped_event, max_adc_sum);
+} 

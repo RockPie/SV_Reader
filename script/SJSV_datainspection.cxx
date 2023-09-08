@@ -56,12 +56,13 @@ int main(int argc, char** argv) {
     eventbuilder.set_bcid_cycle(bcid_cycle);
     eventbuilder.set_tdc_slope(tdc_slope);
     eventbuilder.parse_raw_data();
+    eventbuilder.reconstruct_event(100000);
     LOG(INFO) << "Saving to parsed rootfile ...";
     if (eventbuilder.save_parsed_data(filename_parsed_root))
         LOG(INFO) << "Save to rootfile success";
     else
         LOG(ERROR) << "Save to rootfile fail";
-    eventbuilder.reconstruct_event(100000);
+    
     // * -------------------------------------------------------------------------------------------
 
     auto analysis_file = new TFile(filename_analysis_root.c_str(), "RECREATE");
@@ -177,6 +178,47 @@ int main(int argc, char** argv) {
     qp_canvas_event_chnnum->Close();
     // * -------------------------------------------------------------------------------------------
 
+    // * -- Plot event ADC histogram --
+    // * -------------------------------------------------------------------------------------------
+    auto qp_canvas_event_adc = new TCanvas("qp_canvas_event_adc", "Quick plot", canvas_width, canvas_height);
+    auto _event_adc_hist = eventbuilder.quick_plot_event_adc_hist(200, 0, 100000);
+
+    _event_adc_hist->SetLineColor(kBlue);
+    _event_adc_hist->SetLineWidth(2);
+
+    _event_adc_hist->SetFillColor(kBlue-10);
+
+    _event_adc_hist->Draw();
+
+    if(save_to_png)
+        qp_canvas_event_adc->SaveAs("../pics/quick_plot_event_adc.png");
+    if (save_to_rootfile){
+        analysis_file->cd();
+        _event_adc_hist->Write("event_adc_hist");
+    }
+    qp_canvas_event_adc->Close();
+    // * -------------------------------------------------------------------------------------------
+
+    // * -- Plot mapped events sum --
+    // * -------------------------------------------------------------------------------------------
+
+    auto qp_canvas_mapped_events_sum = new TCanvas("qp_canvas_mapped_events_sum", "Quick plot", canvas_width, canvas_height);
+    qp_canvas_event_chnnum->cd();
+    auto _mapped_events_sum = eventbuilder.quick_plot_mapped_events_sum();
+
+    _mapped_events_sum->Draw("colz");
+
+
+    if(save_to_png)
+        qp_canvas_mapped_events_sum->SaveAs("../pics/quick_plot_mapped_events_sum.png");
+    if (save_to_rootfile){
+        analysis_file->cd();
+        qp_canvas_mapped_events_sum->Write("mapped_events_sum");
+    }
+    qp_canvas_mapped_events_sum->Close();
+
+    // * -------------------------------------------------------------------------------------------
+
     // * -- Plot mapped events --
     // * -------------------------------------------------------------------------------------------
     std::vector<TCanvas*> _vec_mapped_plots;
@@ -202,27 +244,6 @@ int main(int argc, char** argv) {
         qp_canvas_mapped_events->Close();
         delete qp_canvas_mapped_events;
     }
-    // * -------------------------------------------------------------------------------------------
-
-    // * -- Plot event ADC histogram --
-    // * -------------------------------------------------------------------------------------------
-    auto qp_canvas_event_adc = new TCanvas("qp_canvas_event_adc", "Quick plot", canvas_width, canvas_height);
-    auto _event_adc_hist = eventbuilder.quick_plot_event_adc_hist(200, 0, 100000);
-
-    _event_adc_hist->SetLineColor(kBlue);
-    _event_adc_hist->SetLineWidth(2);
-
-    _event_adc_hist->SetFillColor(kBlue-10);
-
-    _event_adc_hist->Draw();
-
-    if(save_to_png)
-        qp_canvas_event_adc->SaveAs("../pics/quick_plot_event_adc.png");
-    if (save_to_rootfile){
-        analysis_file->cd();
-        _event_adc_hist->Write("event_adc_hist");
-    }
-    qp_canvas_event_adc->Close();
     // * -------------------------------------------------------------------------------------------
 
     analysis_file->Close();
