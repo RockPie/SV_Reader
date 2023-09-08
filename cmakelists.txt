@@ -48,6 +48,8 @@ target_include_directories(SV_Reader
 )
 
 add_executable(raw_data_processing      ${CMAKE_CURRENT_SOURCE_DIR}/script/SJSV_rawdata.cxx)
+add_executable(data_inspection          ${CMAKE_CURRENT_SOURCE_DIR}/script/SJSV_datainspection.cxx)
 
 
 target_link_libraries(raw_data_processing  SV_Reader)
+target_link_libraries(data_inspection      SV_Reader)

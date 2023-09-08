@@ -11,6 +11,8 @@
 #include "TAxis.h"  
 #include "TLegend.h"
 #include "TH1.h"
+#include "TH2D.h"
+#include "TStyle.h"
 
 #include "csv.h"
 
@@ -29,6 +31,11 @@ class SJSV_eventbuilder
             uint16_t    adc;
         };
 
+        struct parsed_event {
+            std::vector<parsed_frame> frames;
+            std::vector<uint16_t> id;
+        };
+
         struct raw_mapping_info {
             std::vector<Short_t> board_num_array;
             std::vector<Short_t> channel_num_array;
@@ -43,10 +50,30 @@ class SJSV_eventbuilder
             std::vector<Double_t> y_coords_array;
             std::vector<Double_t> cell_size_array;
         };
+
+        struct mapped_event {
+            std::vector<Double_t> x_coords_array;
+            std::vector<Double_t> y_coords_array;
+            std::vector<Double_t> cell_size_array;
+            std::vector<Double_t> value_array;
+            std::vector<Double_t> error_array;
+        };
         
     public:
         SJSV_eventbuilder();
         ~SJSV_eventbuilder();
+
+        inline channel_mapping_info* get_mapping_info_ptr() {
+            return mapping_info_ptr;
+        }
+
+        inline parsed_frame* frame_at(uint64_t _index){
+            if (_index >= vec_parsed_frame_ptr->size()) {
+                LOG(ERROR) << "Index out of range";
+                return nullptr;
+            }
+            return &vec_parsed_frame_ptr->at(_index);
+        }
 
         // * Load raw data from rootfile created by SJSV_pcapreader
         // * @param _filename_str: filename of rootfile
@@ -62,6 +89,13 @@ class SJSV_eventbuilder
             const raw_mapping_info &_raw_mapping_info);
 
         bool load_mapping_file(const std::string &_filename_str);
+
+        // * Map frames to coordinates
+        // * @param _vec_parsed_frame: vector of parsed frames
+        // * @param _mapping_info: mapping info
+        // * @return: mapped_event
+        // ! This function will ignore error information
+        mapped_event map_event(const std::vector<SJSV_eventbuilder::parsed_frame> &_vec_parsed_frame, const SJSV_eventbuilder::channel_mapping_info &_mapping_info);
 
         // * Set cycle time of BCID in ns
         inline void set_bcid_cycle(uint8_t _bcid_cycle) {
@@ -94,6 +128,7 @@ class SJSV_eventbuilder
         // * @param _end_time: end time in nss
         // * @return: TGraph of time and frame index
         TGraph* quick_plot_time_index(double _start_time, double _end_time);
+        TGraph* quick_plot_time_index(void);
 
         // * Quick plot of multiple channels
         // * @param _vec_channel: vector of channels to be plotted
@@ -104,6 +139,10 @@ class SJSV_eventbuilder
 
         // * Quick histogram of single channel
         TH1D* quick_plot_single_channel_hist(uint16_t _channel, Int_t _bin_num, Double_t _bin_low, Double_t _bin_high);
+
+        TH2D* quick_plot_mapped_event(const mapped_event &_mapped_event, Double_t _max_adc = -1);
+
+        TH2D* quick_plot_multiple_channels_hist(std::vector<uint16_t> _vec_channel, Int_t _bin_num, Double_t _bin_low, Double_t _bin_high);
 
         // * Simple pedestal calculation - mean of lower 30% ADC
         std::vector<uint16_t> get_simple_pedestal();
@@ -136,6 +175,7 @@ class SJSV_eventbuilder
                 LOG(WARNING) << "Pedestal subtraction is already " << (_enable ? "enabled" : "disabled") << std::endl;
             pedestal_subtraction_enabled = _enable;
         }
+
 
     private:
         inline uint16_t get_uni_channel(const SJSV_pcapreader::uni_frame &_frame) {

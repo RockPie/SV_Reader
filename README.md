@@ -18,7 +18,6 @@
 - C++17 compiler
 - [CERN ROOT](https://root.cern.ch/) 6.22 or higher
 - [PcapPlusPlus](https://pcapplusplus.github.io)
-- [easyloggingpp](https://github.com/abumq/easyloggingpp)
 
 
 ## Pcap Reader -- `SJSV_pcapreader.cpp/h`

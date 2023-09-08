@@ -8,6 +8,9 @@ SJSV_eventbuilder::SJSV_eventbuilder():
     bcid_cycle(25),
     tdc_slope(25) {
     vec_frame_ptr = new std::vector<SJSV_pcapreader::uni_frame>;
+    vec_parsed_frame_ptr = new std::vector<parsed_frame>;
+    vec_pedestal_ptr = new std::vector<uint16_t>;
+    mapping_info_ptr = new channel_mapping_info;
 }
 
 SJSV_eventbuilder::~SJSV_eventbuilder() {
@@ -250,7 +253,7 @@ TGraph* SJSV_eventbuilder::quick_plot_single_channel(uint16_t _channel, double _
         delete _graph;
         return nullptr;
     } else {
-        LOG(INFO) << _plot_point_cnt << " points plotted";
+        //LOG(INFO) << _plot_point_cnt << " points plotted";
     }
 
 
@@ -307,6 +310,24 @@ TGraph* SJSV_eventbuilder::quick_plot_time_index(double _start_time, double _end
     }
 
     return _graph;
+}
+
+TGraph* SJSV_eventbuilder::quick_plot_time_index(void){
+    double _global_min_time = 0;
+    double _global_max_time = 0;
+    if (!is_parsed_data_valid) {
+        LOG(ERROR) << "Parsed data is not valid for browsing";
+        return nullptr;
+    }
+    for (auto _parsed_frame : *vec_parsed_frame_ptr) {
+        if (_parsed_frame.time_ns < _global_min_time) {
+            _global_min_time = _parsed_frame.time_ns;
+        }
+        if (_parsed_frame.time_ns > _global_max_time) {
+            _global_max_time = _parsed_frame.time_ns;
+        }
+    }
+    return quick_plot_time_index(_global_min_time, _global_max_time);
 }
 
 TMultiGraph* SJSV_eventbuilder::quick_plot_multiple_channels(std::vector<uint16_t> _vec_channel, double _start_time, double _end_time) {
@@ -386,7 +407,7 @@ TH1D* SJSV_eventbuilder::quick_plot_single_channel_hist(uint16_t _channel, Int_t
         delete _hist;
         return nullptr;
     } else {
-        LOG(INFO) << _plot_point_cnt << " points plotted";
+        // LOG(INFO) << _plot_point_cnt << " points plotted";
     }
 
     return _hist;
@@ -414,9 +435,10 @@ std::vector<uint16_t> SJSV_eventbuilder::get_simple_pedestal() {
         _channel_adc_values.at(_channel).push_back(_adc);
     }
 
-    for (auto _single_channel_adc_values : _channel_adc_values) {
+    for (auto _channel_index=0; _channel_index<_channel_adc_values.size(); _channel_index++) {
+        auto _single_channel_adc_values = _channel_adc_values.at(_channel_index);
         if (_single_channel_adc_values.size() <= 4) {
-            LOG(WARNING) << "Channel has too few adc values";
+            LOG(WARNING) << "chn" << _channel_index << " too few adc values: ";
             _vec_pedestal.push_back(0);
             continue;
         }
@@ -479,7 +501,7 @@ SJSV_eventbuilder::raw_mapping_info SJSV_eventbuilder::read_mapping_csv_file(con
     LOG(INFO) << "Reading mapping file: " << _filename_str;
     auto _res = SJSV_eventbuilder::raw_mapping_info();
 
-    if (!std::filesystem::exists(_filename_str)) {
+    if (_filename_str.empty()) {
         LOG(ERROR) << "File not found: " << _filename_str;
         return _res;
     }
@@ -604,4 +626,126 @@ bool SJSV_eventbuilder::load_mapping_file(const std::string &_filename_str){
     this->mapping_info_ptr = new channel_mapping_info(_channel_mapping_info);
     LOG(INFO) << "Loaded mapping file: " << _filename_str;
     return true;
+}
+
+
+SJSV_eventbuilder::mapped_event SJSV_eventbuilder::map_event(const std::vector<SJSV_eventbuilder::parsed_frame> &_vec_parsed_frame, const SJSV_eventbuilder::channel_mapping_info &_mapping_info){
+    auto _res = SJSV_eventbuilder::mapped_event();
+    if (_vec_parsed_frame.empty()) {
+        LOG(ERROR) << "Parsed frame vector is empty";
+        return _res;
+    }
+    if (_mapping_info.uni_channel_array.empty()) {
+        LOG(ERROR) << "Mapping info is empty";
+        return _res;
+    }
+
+    auto _vec_uni_channel = _mapping_info.uni_channel_array;
+    auto _vec_x_coords  = _mapping_info.x_coords_array;
+    auto _vec_y_coords  = _mapping_info.y_coords_array;
+    auto _vec_cell_size = _mapping_info.cell_size_array;
+
+    for (auto i=0; i<_vec_parsed_frame.size(); i++) {
+        auto _parsed_frame = _vec_parsed_frame.at(i);
+        auto _uni_channel = _parsed_frame.uni_channel;
+        auto _adc = _parsed_frame.adc;
+
+        int _index = std::find(_vec_uni_channel.begin(), _vec_uni_channel.end(), _uni_channel) - _vec_uni_channel.begin();
+
+        if (_index == _vec_uni_channel.size()) {
+            LOG(ERROR) << "Cannot find channel " << _uni_channel << " in mapping info";
+            continue;
+        }
+
+        auto _x_coord = _vec_x_coords.at(_index);
+        auto _y_coord = _vec_y_coords.at(_index);
+        auto _cell_size = _vec_cell_size.at(_index);
+
+        _res.x_coords_array.push_back(_x_coord);
+        _res.y_coords_array.push_back(_y_coord);
+        _res.cell_size_array.push_back(_cell_size);
+        _res.value_array.push_back(_adc);
+        // _res.error_array.push_back(sqrt(_adc));
+    }
+
+    return _res;
+}
+
+TH2D* SJSV_eventbuilder::quick_plot_mapped_event(const mapped_event &_mapped_event, Double_t _max_adc){
+    TH2D *_hist = new TH2D();
+    auto _hist_name = "mapped event";
+    _hist->SetTitle(_hist_name);
+
+    auto _xaxis = _hist->GetXaxis();
+    _xaxis->SetTitle("X (pixel)");
+    auto _yaxis = _hist->GetYaxis();
+    _yaxis->SetTitle("Y (pixel)");
+
+    auto _x_bin_num = 105;
+    auto _y_bin_num = 105;
+    auto _x_bin_low = 0;
+    auto _x_bin_high = 105;
+    auto _y_bin_low = 0;
+    auto _y_bin_high = 105;
+
+    _hist->SetBins(_x_bin_num, _x_bin_low, _x_bin_high, _y_bin_num, _y_bin_low, _y_bin_high);
+
+    if (_max_adc > 0) {
+        _hist->SetMaximum(_max_adc);
+    }
+
+    for (auto i=0; i<_mapped_event.x_coords_array.size(); i++) {
+        auto _x_coord = _mapped_event.x_coords_array.at(i);
+        auto _y_coord = _mapped_event.y_coords_array.at(i);
+        auto _cell_size = _mapped_event.cell_size_array.at(i);
+        auto _value = _mapped_event.value_array.at(i);
+        // auto _log_value = log10(_value);
+        // auto _error = _mapped_event.error_array.at(i);
+        auto _x_offset = _cell_size / 2;
+        auto _y_offset = _cell_size / 2;
+        for (auto _x = _x_coord - _x_offset; _x < _x_coord + _x_offset; _x++) {
+            for (auto _y = _y_coord - _y_offset; _y < _y_coord + _y_offset; _y++) {
+                _hist->Fill(_x, _y, _value);
+            }
+        }
+    }
+    // set color palette
+    // list of color palettes: https://root.cern.ch/doc/master/classTColor.html
+    gStyle->SetPalette(kSunset);
+    gPad->SetRightMargin(0.13);
+    _hist->SetStats(0);
+    // show color bar
+    _hist->SetContour(100);
+    return _hist;
+}
+
+TH2D* SJSV_eventbuilder::quick_plot_multiple_channels_hist(std::vector<uint16_t> _vec_channel, Int_t _bin_num, Double_t _bin_low, Double_t _bin_high){
+    TH2D* _hist = new TH2D();
+    auto _hist_name = "multiple channels";
+    _hist->SetTitle(_hist_name);
+
+    _hist->GetXaxis()->SetTitle("Channel");
+    _hist->GetYaxis()->SetTitle("ADC");
+    auto _x_bin_num = _vec_channel.size();
+    auto _x_bin_low = *std::min_element(_vec_channel.begin(), _vec_channel.end());
+    auto _x_bin_high = _vec_channel.size() + _x_bin_low;
+    auto _y_bin_num = _bin_num;
+    auto _y_bin_low = _bin_low;
+    auto _y_bin_high = _bin_high;
+
+    _hist->SetBins(_x_bin_num, _x_bin_low, _x_bin_high, _y_bin_num, _y_bin_low, _y_bin_high);
+
+    auto _frame_num = vec_parsed_frame_ptr->size();
+    for (auto i=0; i<_frame_num; i++) {
+        auto _parsed_frame = vec_parsed_frame_ptr->at(i);
+        auto _channel = _parsed_frame.uni_channel;
+        auto _adc = _parsed_frame.adc;
+        if (std::find(_vec_channel.begin(), _vec_channel.end(), _channel) != _vec_channel.end()) {
+            _hist->Fill(_channel, _adc);
+            // LOG(DEBUG) << "Filling channel " << _channel << " with adc " << _adc;
+        }
+    }
+    _hist->SetStats(0);
+    gStyle->SetPalette(kBird);
+    return _hist;
 }
