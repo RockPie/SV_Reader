@@ -19,6 +19,8 @@ int main(int argc, char** argv) {
     Int_t bin_num       = 50;
     Double_t bin_low    = 200;
     Double_t bin_high   = 350;
+    Int_t mapped_plot_cnt = 10;
+    Double_t max_event_adc = 1000;
 
     std::vector<uint16_t> interested_channels;
     for (auto i = 64; i < 128; i++) interested_channels.push_back(i);
@@ -35,7 +37,6 @@ int main(int argc, char** argv) {
     std::string filename_parsed_root = "../tmp/parsed_" + filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1) + ".root";
     std::string filename_mapping_csv = "../data/config/Mapping_tb2023SPS.csv";
 
-    // ! Create PCAP reader and read PCAP file into raw rootfile
     // * -------------------------------------------------------------------------------------------
     SJSV_pcapreader pcapreader(filename_pcap);
     pcapreader.read_pcapfile();
@@ -48,7 +49,6 @@ int main(int argc, char** argv) {
         LOG(ERROR) << "Save to rootfile fail";
     // * -------------------------------------------------------------------------------------------
 
-    // ! Create event builder and read raw rootfile into parsed rootfile
     // * -------------------------------------------------------------------------------------------
     SJSV_eventbuilder eventbuilder;
     eventbuilder.load_mapping_file(filename_mapping_csv);
@@ -61,12 +61,14 @@ int main(int argc, char** argv) {
         LOG(INFO) << "Save to rootfile success";
     else
         LOG(ERROR) << "Save to rootfile fail";
+    eventbuilder.reconstruct_event(100000);
     // * -------------------------------------------------------------------------------------------
 
     auto analysis_file = new TFile(filename_analysis_root.c_str(), "RECREATE");
     // * -------------------------------------------------------------------------------------------
 
     // * -- Plot all channel hist --
+    // * -------------------------------------------------------------------------------------------
     auto qp_canvas_all_hist = new TCanvas("qp_canvas_all_hist", "Quick plot", canvas_width, canvas_height);
     auto _all_hist = eventbuilder.quick_plot_multiple_channels_hist(interested_channels, bin_num, bin_low, bin_high);
     _all_hist->Draw("colz");
@@ -81,6 +83,7 @@ int main(int argc, char** argv) {
     // * -------------------------------------------------------------------------------------------
 
     // * -- Plot reconstructed time --
+    // * -------------------------------------------------------------------------------------------
     auto qb_canvas_time_index = new TCanvas("qb_canvas_time_index", "Quick browse time", canvas_width, canvas_height);
     auto qb_tgraph2 = eventbuilder.quick_plot_time_index();
     qb_tgraph2->Draw("APL");
@@ -98,6 +101,7 @@ int main(int argc, char** argv) {
     // * -------------------------------------------------------------------------------------------
 
     // * -- Plot channel ADC histogram --
+    // * -------------------------------------------------------------------------------------------
     auto qp_canvas_multi_ADC_hist = new TCanvas("qp_canvas", "Quick plot", canvas_width, canvas_height);
 
     std::vector<TH1D*> _vec_hist;
@@ -117,7 +121,9 @@ int main(int argc, char** argv) {
         if (_vec_hist.at(i) == nullptr) continue;
         _vec_hist.at(i)->SetLineColor(kBlue);
         _vec_hist.at(i)->SetLineWidth(2);
-        _vec_hist.at(i)->SetStats(0);
+        _vec_hist.at(i)->SetStats(true);
+        // add fill color
+        _vec_hist.at(i)->SetFillColor(kBlue-10);
         _vec_hist.at(i)->GetXaxis()->SetTitle("ADC");
         _vec_hist.at(i)->GetYaxis()->SetTitle("Counts");
         _vec_hist.at(i)->Draw("same");
@@ -134,18 +140,90 @@ int main(int argc, char** argv) {
     if (save_to_png)
         qp_canvas_multi_ADC_hist->SaveAs("../pics/quick_plot_hist.png");
     if (save_to_rootfile){
-        // create a tree to store channel histgrams
         analysis_file->cd();
+        // create subfolder
+        analysis_file->mkdir("channel_hist");
+        analysis_file->cd("channel_hist");
+
         for (auto i = 0; i < interested_channels.size(); i++){
             if (_vec_hist.at(i) == nullptr) continue;
             _vec_hist.at(i)->Write(("channel_" + std::to_string(interested_channels[i])).c_str());
         }
     }
     qp_canvas_multi_ADC_hist->Close();
-
     for (auto _hist : _vec_hist) {
         if (_hist != nullptr) delete _hist;
     }
+    // * -------------------------------------------------------------------------------------------
+
+    // * -- Plot event channel count --
+    // * -------------------------------------------------------------------------------------------
+    auto qp_canvas_event_chnnum = new TCanvas("qp_canvas_event_chnnum", "Quick plot", canvas_width, canvas_height);
+    auto _event_chnnum_hist = eventbuilder.quick_plot_event_chnnum_hist(interested_channels.size()*1.2);
+
+    _event_chnnum_hist->SetLineColor(kBlue);
+    _event_chnnum_hist->SetLineWidth(2);
+
+    _event_chnnum_hist->SetFillColor(kBlue-10);
+
+    _event_chnnum_hist->Draw();
+
+    if(save_to_png)
+        qp_canvas_event_chnnum->SaveAs("../pics/quick_plot_event_chnnum.png");
+    if (save_to_rootfile){
+        analysis_file->cd();
+        _event_chnnum_hist->Write("event_chnnum_hist");
+    }
+    qp_canvas_event_chnnum->Close();
+    // * -------------------------------------------------------------------------------------------
+
+    // * -- Plot mapped events --
+    // * -------------------------------------------------------------------------------------------
+    std::vector<TCanvas*> _vec_mapped_plots;
+    if (save_to_rootfile){
+        analysis_file->mkdir("mapped_events");
+        analysis_file->cd("mapped_events");
+    }
+    for (auto i = 0; i < mapped_plot_cnt; i++) {
+        auto qp_canvas_mapped_events = new TCanvas(("qp_canvas_mapped_events_" + std::to_string(i)).c_str(), "Quick plot", canvas_width, canvas_height);
+        auto _mapped_event = eventbuilder.map_event(eventbuilder.event_at(i), *eventbuilder.get_mapping_info_ptr());
+        auto _2d_hist = eventbuilder.quick_plot_mapped_event(_mapped_event, max_event_adc);
+        qp_canvas_mapped_events->cd();
+        _2d_hist->Draw("colz");
+        _vec_mapped_plots.push_back(qp_canvas_mapped_events);
+
+        if (save_to_png)
+            qp_canvas_mapped_events->SaveAs(("../pics/quick_plot_mapped_events_" + std::to_string(i) + ".png").c_str());
+        if (save_to_rootfile){
+            qp_canvas_mapped_events->Write(("mapped_events_" + std::to_string(i)).c_str());
+        }
+        // avoid changing palette
+        delete _2d_hist;
+        qp_canvas_mapped_events->Close();
+        delete qp_canvas_mapped_events;
+    }
+    // * -------------------------------------------------------------------------------------------
+
+    // * -- Plot event ADC histogram --
+    // * -------------------------------------------------------------------------------------------
+    auto qp_canvas_event_adc = new TCanvas("qp_canvas_event_adc", "Quick plot", canvas_width, canvas_height);
+    auto _event_adc_hist = eventbuilder.quick_plot_event_adc_hist(200, 0, 100000);
+
+    _event_adc_hist->SetLineColor(kBlue);
+    _event_adc_hist->SetLineWidth(2);
+
+    _event_adc_hist->SetFillColor(kBlue-10);
+
+    _event_adc_hist->Draw();
+
+    if(save_to_png)
+        qp_canvas_event_adc->SaveAs("../pics/quick_plot_event_adc.png");
+    if (save_to_rootfile){
+        analysis_file->cd();
+        _event_adc_hist->Write("event_adc_hist");
+    }
+    qp_canvas_event_adc->Close();
+    // * -------------------------------------------------------------------------------------------
 
     analysis_file->Close();
     return 0;

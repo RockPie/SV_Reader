@@ -32,8 +32,8 @@ class SJSV_eventbuilder
         };
 
         struct parsed_event {
-            std::vector<parsed_frame> frames;
-            std::vector<uint16_t> id;
+            std::vector<parsed_frame*> frames_ptr;
+            uint32_t id;
         };
 
         struct raw_mapping_info {
@@ -96,6 +96,9 @@ class SJSV_eventbuilder
         // * @return: mapped_event
         // ! This function will ignore error information
         mapped_event map_event(const std::vector<SJSV_eventbuilder::parsed_frame> &_vec_parsed_frame, const SJSV_eventbuilder::channel_mapping_info &_mapping_info);
+        mapped_event map_event(const parsed_event &_parsed_event, const SJSV_eventbuilder::channel_mapping_info &_mapping_info);
+
+        bool reconstruct_event(Double_t _threshold_time_ns);
 
         // * Set cycle time of BCID in ns
         inline void set_bcid_cycle(uint8_t _bcid_cycle) {
@@ -144,6 +147,10 @@ class SJSV_eventbuilder
 
         TH2D* quick_plot_multiple_channels_hist(std::vector<uint16_t> _vec_channel, Int_t _bin_num, Double_t _bin_low, Double_t _bin_high);
 
+        TH1D* quick_plot_event_chnnum_hist(int max_channel_num = 64);
+
+        TH1D* quick_plot_event_adc_hist(Int_t _bin_num, Double_t _bin_low, Double_t _bin_high);
+
         // * Simple pedestal calculation - mean of lower 30% ADC
         std::vector<uint16_t> get_simple_pedestal();
 
@@ -174,6 +181,14 @@ class SJSV_eventbuilder
             if (_enable == pedestal_subtraction_enabled)
                 LOG(WARNING) << "Pedestal subtraction is already " << (_enable ? "enabled" : "disabled") << std::endl;
             pedestal_subtraction_enabled = _enable;
+        }
+
+        inline parsed_event event_at(uint64_t _index) {
+            if (_index >= vec_parsed_event_ptr->size()) {
+                LOG(ERROR) << "Index out of range";
+                return parsed_event();
+            }
+            return vec_parsed_event_ptr->at(_index);
         }
 
 
@@ -211,6 +226,7 @@ class SJSV_eventbuilder
         std::vector<SJSV_pcapreader::uni_frame>* vec_frame_ptr;
         std::vector<parsed_frame>* vec_parsed_frame_ptr;
         std::vector<uint16_t>* vec_pedestal_ptr;
+        std::vector<parsed_event>* vec_parsed_event_ptr;
 
         channel_mapping_info* mapping_info_ptr;
 };

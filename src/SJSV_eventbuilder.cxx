@@ -11,6 +11,7 @@ SJSV_eventbuilder::SJSV_eventbuilder():
     vec_parsed_frame_ptr = new std::vector<parsed_frame>;
     vec_pedestal_ptr = new std::vector<uint16_t>;
     mapping_info_ptr = new channel_mapping_info;
+    vec_parsed_event_ptr = new std::vector<parsed_event>;
 }
 
 SJSV_eventbuilder::~SJSV_eventbuilder() {
@@ -25,6 +26,9 @@ SJSV_eventbuilder::~SJSV_eventbuilder() {
     }
     if (mapping_info_ptr != nullptr) {
         delete mapping_info_ptr;
+    }
+    if (vec_parsed_event_ptr != nullptr) {
+        delete vec_parsed_event_ptr;
     }
 }
 
@@ -247,7 +251,7 @@ TGraph* SJSV_eventbuilder::quick_plot_single_channel(uint16_t _channel, double _
     // set y axis label
     auto _yaxis = _graph->GetYaxis();
     _yaxis->SetTitle("ADC");
-
+    _graph->SetStats(1);
     if (_plot_point_cnt == 0) {
         LOG(WARNING) << "No points plotted";
         delete _graph;
@@ -628,7 +632,6 @@ bool SJSV_eventbuilder::load_mapping_file(const std::string &_filename_str){
     return true;
 }
 
-
 SJSV_eventbuilder::mapped_event SJSV_eventbuilder::map_event(const std::vector<SJSV_eventbuilder::parsed_frame> &_vec_parsed_frame, const SJSV_eventbuilder::channel_mapping_info &_mapping_info){
     auto _res = SJSV_eventbuilder::mapped_event();
     if (_vec_parsed_frame.empty()) {
@@ -671,6 +674,14 @@ SJSV_eventbuilder::mapped_event SJSV_eventbuilder::map_event(const std::vector<S
     return _res;
 }
 
+SJSV_eventbuilder::mapped_event SJSV_eventbuilder::map_event(const SJSV_eventbuilder::parsed_event &_parsed_event, const SJSV_eventbuilder::channel_mapping_info &_mapping_info){
+    std::vector<SJSV_eventbuilder::parsed_frame> _adapter_vec_parsed_frame;
+    for (auto _parsed_frame : _parsed_event.frames_ptr) {
+        _adapter_vec_parsed_frame.push_back(*_parsed_frame);
+    }
+    return map_event(_adapter_vec_parsed_frame, _mapping_info);
+}
+
 TH2D* SJSV_eventbuilder::quick_plot_mapped_event(const mapped_event &_mapped_event, Double_t _max_adc){
     TH2D *_hist = new TH2D();
     auto _hist_name = "mapped event";
@@ -710,9 +721,8 @@ TH2D* SJSV_eventbuilder::quick_plot_mapped_event(const mapped_event &_mapped_eve
         }
     }
     // set color palette
-    // list of color palettes: https://root.cern.ch/doc/master/classTColor.html
     gStyle->SetPalette(kSunset);
-    gPad->SetRightMargin(0.13);
+    // list of color palettes: https://root.cern.ch/doc/master/classTColor.html
     _hist->SetStats(0);
     // show color bar
     _hist->SetContour(100);
@@ -747,5 +757,98 @@ TH2D* SJSV_eventbuilder::quick_plot_multiple_channels_hist(std::vector<uint16_t>
     }
     _hist->SetStats(0);
     gStyle->SetPalette(kBird);
+    return _hist;
+}
+
+bool SJSV_eventbuilder::reconstruct_event(Double_t _threshold_time_ns){
+    auto _parsed_frame_num = vec_parsed_frame_ptr->size();
+    if (_parsed_frame_num == 0) {
+        LOG(ERROR) << "Parsed frame vector is empty";
+        return false;
+    }
+    if (_threshold_time_ns < 0) {
+        LOG(ERROR) << "Threshold time is negative";
+        return false;
+    }
+    if (vec_parsed_event_ptr->size() != 0) {
+        LOG(WARNING) << "Parsed event is not empty, deleting old data";
+        vec_parsed_event_ptr->clear();
+    }
+
+    auto _last_frame_time = vec_parsed_frame_ptr->at(0).time_ns;
+    uint32_t _current_event_id = 0;
+    std::vector<parsed_frame*> _candidate_frames;
+    for (auto _frame_index=0; _frame_index<_parsed_frame_num; _frame_index++){
+        auto _parsed_frame = vec_parsed_frame_ptr->at(_frame_index);
+        auto _time_ns = _parsed_frame.time_ns;
+        auto _uni_channel = _parsed_frame.uni_channel;
+        
+        if (abs(_time_ns - _last_frame_time) < _threshold_time_ns){
+        } else {
+            if (_candidate_frames.size() > 0) {
+                // check repeated channel
+                std::vector<uint16_t> _vec_channel;
+                for (auto _frame_ptr : _candidate_frames) {
+                    _vec_channel.push_back(_frame_ptr->uni_channel);
+                }
+                std::sort(_vec_channel.begin(), _vec_channel.end());
+                auto _it = std::unique(_vec_channel.begin(), _vec_channel.end());
+                _vec_channel.erase(_it, _vec_channel.end());
+
+                if (_vec_channel.size() != _candidate_frames.size()) {
+                    LOG(WARNING) << "Repeated channel found, skipping this event";
+                    _candidate_frames.clear();
+                    continue;
+                }
+                auto _parsed_event = new parsed_event();
+                _parsed_event->frames_ptr = _candidate_frames;
+                _parsed_event->id = _current_event_id;
+                _current_event_id++;
+
+                vec_parsed_event_ptr->push_back(*_parsed_event);
+            }
+            _candidate_frames.clear();
+        }
+        _candidate_frames.push_back(&vec_parsed_frame_ptr->at(_frame_index));
+        _last_frame_time = _time_ns;
+    }
+
+    return true;
+}
+
+TH1D* SJSV_eventbuilder::quick_plot_event_chnnum_hist(int max_channel_num){
+    TH1D* _hist = new TH1D();
+    auto _hist_name = "event channel count";
+    _hist->SetTitle(_hist_name);
+    _hist->SetBins(max_channel_num, 0, max_channel_num);
+
+    for (auto _event: *vec_parsed_event_ptr) {
+        _hist->Fill(_event.frames_ptr.size());
+    }
+    
+    _hist->SetStats(true);
+    _hist->GetXaxis()->SetTitle("Channel number");
+    _hist->GetYaxis()->SetTitle("Event number");
+    return _hist;
+}
+
+TH1D* SJSV_eventbuilder::quick_plot_event_adc_hist(Int_t _bin_num, Double_t _bin_low, Double_t _bin_high){
+    TH1D* _hist = new TH1D();
+    auto _hist_name = "event adc";
+    _hist->SetTitle(_hist_name);
+
+    _hist->SetBins(_bin_num, _bin_low, _bin_high);
+
+    for (auto _event: *vec_parsed_event_ptr) {
+        Double_t _adc_sum = 0;
+        for (auto _frame_ptr : _event.frames_ptr) {
+            _adc_sum += _frame_ptr->adc;
+        }
+        _hist->Fill(_adc_sum);
+    }
+
+    _hist->SetStats(true);
+    _hist->GetXaxis()->SetTitle("ADC");
+    _hist->GetYaxis()->SetTitle("Event number");
     return _hist;
 }
