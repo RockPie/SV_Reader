@@ -1,4 +1,5 @@
 #include <iostream>
+#include <unistd.h>
 #include "TCanvas.h" 
 #include "easylogging++.h"
 #include "SJSV_pcapreader.h"
@@ -11,31 +12,54 @@ int main(int argc, char** argv) {
     START_EASYLOGGINGPP(argc, argv);
     set_easylogger();
 
+    int run_number = 53;
+
+    int opt;
+    while ((opt = getopt(argc, argv, "r:")) != -1){
+        switch (opt){
+            case 'r':
+                run_number = atoi(optarg);
+                break;
+            default:
+                LOG(ERROR) << "Wrong arguments!";
+                return 1;
+        }
+    }
+    
     bool save_to_rootfile = true;
     bool save_to_png = false;
 
     auto bcid_cycle     = uint8_t(25);
     auto tdc_slope      = uint8_t(60);
-    Int_t bin_num       = 50;
-    Double_t bin_low    = 200;
-    Double_t bin_high   = 350;
-    Int_t mapped_plot_cnt = 10;
-    Double_t max_event_adc = 1000;
+    Int_t bin_num       = 1024;
+    Double_t bin_low    = 0;
+    Double_t bin_high   = 1024;
+    Int_t mapped_plot_cnt = 20;
+    Double_t max_event_adc = 1024;
+    Double_t AOI_Start = 0;
+    Double_t AOI_End = 800000000;
+    Double_t reconstructed_threshold_time_ns = 10000;
+    Int_t vmm_num = 16;
 
     std::vector<uint16_t> interested_channels;
-    for (auto i = 64; i < 128; i++) interested_channels.push_back(i);
+    for (auto i = 0; i < 64*vmm_num; i++) interested_channels.push_back(i);
 
     Int_t canvas_width = 1200;
     Int_t canvas_height = 1000;
 
-    std::string filename_pcap = "../data/traffic_2023082102.pcap";
-    auto filename_id = filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1);
-    std::string filename_analysis_root = "../tmp/analysis_" + filename_id + ".root";
+    std::string filename_pcap = "../data/Run0" + std::to_string(run_number);
+    // std::string filename_pcap = "../data/RunTest1";
+    // auto filename_id = filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1);
+    // std::string filename_analysis_root = "../tmp/analysis_" + filename_id + ".root";
+    auto filename_id = filename_pcap.substr(filename_pcap.find_last_of("/")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("/")-1) + "v";
+    std::string filename_analysis_root = "../tmp/analysis_rcsl_" + filename_id + ".root";
     LOG(INFO) << "filename_analysis_root: " << filename_analysis_root;
     // split filename according to '_'
-    std::string filename_raw_root = "../tmp/raw_" + filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1) + ".root";
-    std::string filename_parsed_root = "../tmp/parsed_" + filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1) + ".root";
-    std::string filename_mapping_csv = "../data/config/Mapping_tb2023SPS.csv";
+    // std::string filename_raw_root = "../tmp/raw_" + filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1) + ".root";
+    // std::string filename_parsed_root = "../tmp/parsed_" + filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1) + ".root";
+    std::string filename_raw_root = "../tmp/raw_" + filename_id + ".root";
+    std::string filename_parsed_root = "../tmp/parsed_" + filename_id + ".root";
+    std::string filename_mapping_csv = "../data/config/Mapping_tb2023Sep_VMM2.csv";
 
     // * -------------------------------------------------------------------------------------------
     SJSV_pcapreader pcapreader(filename_pcap);
@@ -56,12 +80,15 @@ int main(int argc, char** argv) {
     eventbuilder.set_bcid_cycle(bcid_cycle);
     eventbuilder.set_tdc_slope(tdc_slope);
     eventbuilder.parse_raw_data();
-    eventbuilder.reconstruct_event(100000);
+    eventbuilder.reconstruct_event_list(reconstructed_threshold_time_ns);
+    eventbuilder.show_first_event_info();
     LOG(INFO) << "Saving to parsed rootfile ...";
     if (eventbuilder.save_parsed_data(filename_parsed_root))
         LOG(INFO) << "Save to rootfile success";
     else
         LOG(ERROR) << "Save to rootfile fail";
+
+    eventbuilder.show_first_event_info();
     
     // * -------------------------------------------------------------------------------------------
 
@@ -81,12 +108,36 @@ int main(int argc, char** argv) {
         _all_hist->Write("all_hist");
     }
     qp_canvas_all_hist->Close();
-    // * -------------------------------------------------------------------------------------------
 
+    // Plot according to VMMs
+    if (save_to_rootfile){
+        analysis_file->mkdir("vmm_hist");
+        analysis_file->cd("vmm_hist");
+    }
+    for (auto _vmm_index=0; _vmm_index<vmm_num; _vmm_index++){
+        std::vector<uint16_t> vmm_interested_channels;
+        for (auto _channel_index=0; _channel_index<64; _channel_index++){
+            vmm_interested_channels.push_back(_vmm_index*64 + _channel_index);
+        }
+        auto qp_canvas_all_hist_vmm = new TCanvas(("qp_canvas_all_hist_vmm_" + std::to_string(_vmm_index)).c_str(), "Quick plot", canvas_width, canvas_height);
+        auto _all_hist_vmm = eventbuilder.quick_plot_multiple_channels_hist(vmm_interested_channels, bin_num, bin_low, bin_high);
+        _all_hist_vmm->SetTitle(("VMM " + std::to_string(_vmm_index)).c_str());
+        _all_hist_vmm->Draw("colz");
+        qp_canvas_all_hist_vmm->SetGridx(2);
+        if (save_to_png)
+            qp_canvas_all_hist_vmm->SaveAs(("../pics/quick_plot_all_hist_vmm_" + std::to_string(_vmm_index) + ".png").c_str());
+        if (save_to_rootfile){
+            _all_hist_vmm->Write(("all_hist_vmm_" + std::to_string(_vmm_index)).c_str());
+        }
+        qp_canvas_all_hist_vmm->Close();
+        delete qp_canvas_all_hist_vmm;
+    }
+    // * -------------------------------------------------------------------------------------------
+    eventbuilder.show_first_event_info();
     // * -- Plot reconstructed time --
     // * -------------------------------------------------------------------------------------------
     auto qb_canvas_time_index = new TCanvas("qb_canvas_time_index", "Quick browse time", canvas_width, canvas_height);
-    auto qb_tgraph2 = eventbuilder.quick_plot_time_index();
+    auto qb_tgraph2 = eventbuilder.quick_plot_time_index(AOI_Start, AOI_End);
     qb_tgraph2->Draw("APL");
  
     qb_canvas_time_index->SetGrid();
@@ -111,7 +162,7 @@ int main(int argc, char** argv) {
         auto _hist = eventbuilder.quick_plot_single_channel_hist(_channel, bin_num, bin_low, bin_high);
         valid_hist_cnt += (_hist == nullptr) ? 0 : 1;
         if (_hist == nullptr) {
-            LOG(WARNING) << "Channel " << _channel << " histogram is nullptr";
+            // LOG(WARNING) << "Channel " << _channel << " histogram is nullptr";
         }
         _vec_hist.push_back(_hist);
     }
@@ -181,7 +232,7 @@ int main(int argc, char** argv) {
     // * -- Plot event ADC histogram --
     // * -------------------------------------------------------------------------------------------
     auto qp_canvas_event_adc = new TCanvas("qp_canvas_event_adc", "Quick plot", canvas_width, canvas_height);
-    auto _event_adc_hist = eventbuilder.quick_plot_event_adc_hist(200, 0, 100000);
+    auto _event_adc_hist = eventbuilder.quick_plot_event_adc_hist(2000, 0, 50000);
 
     _event_adc_hist->SetLineColor(kBlue);
     _event_adc_hist->SetLineWidth(2);
@@ -199,12 +250,34 @@ int main(int argc, char** argv) {
     qp_canvas_event_adc->Close();
     // * -------------------------------------------------------------------------------------------
 
+
+    // * -- Plot event LG ADC histogram --
+    // * -------------------------------------------------------------------------------------------
+    // eventbuilder.check_uni_channels("event_LG_adc");
+    auto qp_canvas_event_LG_adc = new TCanvas("qp_canvas_event_LG_adc", "Quick plot", canvas_width, canvas_height);
+    auto _event_LG_adc_hist = eventbuilder.quick_plot_event_LG_adc_hist(200, 0, 10000);
+
+    _event_LG_adc_hist->SetLineColor(kBlue);
+    _event_LG_adc_hist->SetLineWidth(2);
+
+    _event_LG_adc_hist->SetFillColor(kBlue-10);
+
+    _event_LG_adc_hist->Draw();
+
+    if(save_to_png)
+        qp_canvas_event_LG_adc->SaveAs("../pics/quick_plot_event_LG_adc.png");
+    if (save_to_rootfile){
+        analysis_file->cd();
+        _event_LG_adc_hist->Write("event_LG_adc_hist");
+    }
+    qp_canvas_event_LG_adc->Close();
+
     // * -- Plot mapped events sum --
     // * -------------------------------------------------------------------------------------------
-
+    // eventbuilder.check_uni_channels("mapped_sum");
     auto qp_canvas_mapped_events_sum = new TCanvas("qp_canvas_mapped_events_sum", "Quick plot", canvas_width, canvas_height);
     qp_canvas_event_chnnum->cd();
-    auto _mapped_events_sum = eventbuilder.quick_plot_mapped_events_sum();
+    auto _mapped_events_sum = eventbuilder.quick_plot_mapped_events_sum2();
 
     _mapped_events_sum->Draw("colz");
 
@@ -219,8 +292,10 @@ int main(int argc, char** argv) {
 
     // * -------------------------------------------------------------------------------------------
 
+
     // * -- Plot mapped events --
     // * -------------------------------------------------------------------------------------------
+    // eventbuilder.check_uni_channels("mapped_events");
     std::vector<TCanvas*> _vec_mapped_plots;
     if (save_to_rootfile){
         analysis_file->mkdir("mapped_events");
@@ -245,6 +320,35 @@ int main(int argc, char** argv) {
         delete qp_canvas_mapped_events;
     }
     // * -------------------------------------------------------------------------------------------
+
+    // * save event energy to rootfile
+    std::vector<Double_t> _vec_event_HG_adc_list = eventbuilder.get_event_adc_sum(true);
+    std::vector<Double_t> _vec_event_LG_adc_list = eventbuilder.get_event_adc_sum(false);
+
+    if (save_to_rootfile){
+        analysis_file->mkdir("event_adc");
+        analysis_file->cd("event_adc");
+        analysis_file->mkdir("HG");
+        analysis_file->cd("HG");
+
+        TTree* _tree_event_HG_adc = new TTree("event_HG_adc", "event_HG_adc");
+        _tree_event_HG_adc->Branch("event_HG_adc", &_vec_event_HG_adc_list);
+        _tree_event_HG_adc->Fill();
+        _tree_event_HG_adc->Write();
+
+
+        analysis_file->cd("..");
+        analysis_file->mkdir("LG");
+        analysis_file->cd("LG");
+        
+        TTree* _tree_event_LG_adc = new TTree("event_LG_adc", "event_LG_adc");
+        _tree_event_LG_adc->Branch("event_LG_adc", &_vec_event_LG_adc_list);
+        _tree_event_LG_adc->Fill();
+        _tree_event_LG_adc->Write();
+
+    }
+
+
 
     analysis_file->Close();
     return 0;

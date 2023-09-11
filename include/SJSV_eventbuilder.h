@@ -19,6 +19,9 @@
 #include "SJSV_pcapreader.h"
 
 #define CHN_PER_VMM 64
+#define RECONSTRUCTION_LIST_LEN 10
+#define RECONSTRUCTION_CHK_LEN 10000
+#define MINIMUM_EVENT_HIT 5
 
 INITIALIZE_EASYLOGGINGPP
 
@@ -43,6 +46,7 @@ class SJSV_eventbuilder
             std::vector<Short_t> module_num_array;
             std::vector<Short_t> col_array;
             std::vector<Short_t> row_array;
+            std::vector<Char_t>  gain_array;
         };
 
         struct channel_mapping_info {
@@ -50,6 +54,7 @@ class SJSV_eventbuilder
             std::vector<Double_t> x_coords_array;
             std::vector<Double_t> y_coords_array;
             std::vector<Double_t> cell_size_array;
+            std::vector<Bool_t> is_HG_array;
         };
 
         struct mapped_event {
@@ -57,6 +62,7 @@ class SJSV_eventbuilder
             std::vector<Double_t> y_coords_array;
             std::vector<Double_t> cell_size_array;
             std::vector<Double_t> value_array;
+            std::vector<Double_t> value_LG_array;
             std::vector<Double_t> error_array;
         };
         
@@ -120,6 +126,9 @@ class SJSV_eventbuilder
         // * @return: true if success, false if failed
         bool save_parsed_data(const std::string &_filename_str);
 
+        std::vector<Double_t> get_event_adc_sum(bool _is_HG = true);
+        bool is_frame_HG(const parsed_frame &_frame);
+
         // * Quick browse parsed data by channel
         // * @param _channel: channel to be browsed
         // * @param _start_time: start time in ns
@@ -154,8 +163,14 @@ class SJSV_eventbuilder
 
         TH1D* quick_plot_event_adc_hist(Int_t _bin_num, Double_t _bin_low, Double_t _bin_high);
 
+        TH1D* quick_plot_event_LG_adc_hist(Int_t _bin_num, Double_t _bin_low, Double_t _bin_high);
+
         // * Simple pedestal calculation - mean of lower 30% ADC
         std::vector<uint16_t> get_simple_pedestal();
+
+        TH2D* quick_plot_mapped_events_sum2(void);
+
+        bool reconstruct_event_list(Double_t _threshold_time_ns);
 
         // * Update pedestal to in-class vector
         // * after calling this function, single channel plot will subtract pedestal automatically
@@ -194,10 +209,36 @@ class SJSV_eventbuilder
             return vec_parsed_event_ptr->at(_index);
         }
 
+        inline void check_uni_channels(std::string _info){
+            for (auto _frame: *vec_parsed_frame_ptr) {
+                if (_frame.uni_channel > 20000) {
+                    LOG(ERROR) << _info << " " << _frame.uni_channel << " " << _frame.time_ns << " " << _frame.adc;
+                }
+            }
+        }
+
+        inline void show_first_event_info() {
+            if (vec_parsed_event_ptr->size() == 0) {
+                LOG(ERROR) << "No event found";
+                return;
+            }
+            auto _event = vec_parsed_event_ptr->at(0);
+            // LOG(INFO) << "Event ID: " << _event.id;
+            // LOG(INFO) << "Frame number: " << _event.frames_ptr.size();
+            // LOG(INFO) << "Frame number (LG): " << _event.frames_LG_ptr.size();
+            // LOG(INFO) << "Uni channes: ";
+            // for (auto _frame: _event.frames_ptr) {
+            //     LOG(INFO) << _frame->uni_channel;
+            // }
+            // LOG(INFO) << "ADC: ";
+            // for (auto _frame: _event.frames_ptr) {
+            //     LOG(INFO) << _frame->adc;
+            // }
+        }
 
     private:
         inline uint16_t get_uni_channel(const SJSV_pcapreader::uni_frame &_frame) {
-            return (_frame.vmm_id << 6) + _frame.channel;
+            return _frame.vmm_id * 64  + _frame.channel;
         }
 
         inline uint32_t get_combined_corse_time(const SJSV_pcapreader::uni_frame &_frame) {

@@ -148,7 +148,8 @@ bool SJSV_eventbuilder::parse_raw_data(){
             }
             auto _timestamp_offset = _timestamp_current - _timestamp_start;
             auto _parsed_frame = parse_frame(_frame, _timestamp_offset);
-            vec_parsed_frame_ptr->push_back(_parsed_frame);
+            auto _parsed_frame_new = new parsed_frame(_parsed_frame);
+            vec_parsed_frame_ptr->push_back(*_parsed_frame_new);
         } else {
             _time_frame_count++;
             if (!_first_timestamp_found) {
@@ -256,7 +257,7 @@ TGraph* SJSV_eventbuilder::quick_plot_single_channel(uint16_t _channel, double _
     _yaxis->SetTitle("ADC");
     _graph->SetStats(1);
     if (_plot_point_cnt == 0) {
-        LOG(WARNING) << "No points plotted";
+        // LOG(WARNING) << "No points plotted";
         delete _graph;
         return nullptr;
     } else {
@@ -309,7 +310,7 @@ TGraph* SJSV_eventbuilder::quick_plot_time_index(double _start_time, double _end
     _yaxis->SetTitle("Time (ns)");
 
     if (_plot_point_cnt == 0) {
-        LOG(WARNING) << "No points plotted";
+        //LOG(WARNING) << "No points plotted";
         delete _graph;
         return nullptr;
     } else {
@@ -358,7 +359,7 @@ TMultiGraph* SJSV_eventbuilder::quick_plot_multiple_channels(std::vector<uint16_
         auto _graph = quick_plot_single_channel(_channel, _start_time, _end_time);
         
         if (_graph == nullptr) {
-            LOG(WARNING) << "Graph for channel " << _channel << " is null";
+            // LOG(WARNING) << "Graph for channel " << _channel << " is null";
             auto _graph_placeholder = new TGraph();
             _mg->Add(_graph_placeholder);
             continue;
@@ -410,7 +411,7 @@ TH1D* SJSV_eventbuilder::quick_plot_single_channel_hist(uint16_t _channel, Int_t
     // _hist->Scale(1.0/_hist->Integral());
 
     if (_plot_point_cnt == 0) {
-        LOG(WARNING) << "No points plotted";
+        //LOG(WARNING) << "No points plotted";
         delete _hist;
         return nullptr;
     } else {
@@ -504,6 +505,44 @@ std::vector<uint16_t> SJSV_eventbuilder::load_pedestal_csv(const std::string &_f
     return _vec_pedestal;
 }
 
+bool SJSV_eventbuilder::is_frame_HG(const parsed_frame &_frame){
+    auto _uni_channel = _frame.uni_channel;
+    auto _vec_uni_channel = mapping_info_ptr->uni_channel_array;
+    auto _vec_Gain = mapping_info_ptr->is_HG_array;
+    auto _vec_index = std::find(_vec_uni_channel.begin(), _vec_uni_channel.end(), _uni_channel);
+    if (_vec_index == _vec_uni_channel.end()) {
+        // LOG(ERROR) << "Cannot find uni channel " << _uni_channel << " in mapping info";
+        return false;
+    }
+    auto _index = std::distance(_vec_uni_channel.begin(), _vec_index);
+    return _vec_Gain.at(_index);
+}
+
+std::vector<Double_t> SJSV_eventbuilder::get_event_adc_sum(bool _is_HG){
+    std::vector<Double_t> _vec_event_adc_sum;
+    if (_is_HG){
+        for (auto _event: *vec_parsed_event_ptr) {
+            Double_t _adc_sum = 0;
+            for (auto _frame_ptr : _event.frames_ptr) {
+                if (is_frame_HG(*_frame_ptr))
+                    _adc_sum += _frame_ptr->adc;
+            }
+            _vec_event_adc_sum.push_back(_adc_sum);
+        }
+    } else {
+        for (auto _event: *vec_parsed_event_ptr) {
+            Double_t _adc_sum = 0;
+            for (auto _frame_ptr : _event.frames_ptr) {
+                if (!is_frame_HG(*_frame_ptr))
+                    _adc_sum += _frame_ptr->adc;
+            }
+            _vec_event_adc_sum.push_back(_adc_sum);
+        }
+    }
+    return _vec_event_adc_sum;
+}
+
+
 SJSV_eventbuilder::raw_mapping_info SJSV_eventbuilder::read_mapping_csv_file(const  std::string &_filename_str){
     LOG(INFO) << "Reading mapping file: " << _filename_str;
     auto _res = SJSV_eventbuilder::raw_mapping_info();
@@ -514,16 +553,19 @@ SJSV_eventbuilder::raw_mapping_info SJSV_eventbuilder::read_mapping_csv_file(con
     }
 
     std::vector<std::vector<Short_t>> _mapping_array_res;
-    io::CSVReader <5> in(_filename_str.c_str());
-    in.read_header(io::ignore_extra_column, "BoardNum", "ChannelNum", "ModuleNum", "Col", "Row");
+    io::CSVReader <6> in(_filename_str.c_str());
+    in.read_header(io::ignore_extra_column, "BoardNum", "ChannelNum", "ModuleNum", "Col", "Row", "Gain");
     Short_t _board_num, _channel_num, _module_num, _col, _row;
+    Char_t _gain;
     std::vector<Short_t> _board_num_array, _channel_num_array, _module_num_array, _col_array, _row_array;
-    while (in.read_row(_board_num, _channel_num, _module_num, _col, _row)) {
+    std::vector<Char_t> _gain_array;
+    while (in.read_row(_board_num, _channel_num, _module_num, _col, _row, _gain)) {
         _res.board_num_array.push_back(_board_num);
         _res.channel_num_array.push_back(_channel_num);
         _res.module_num_array.push_back(_module_num);
         _res.col_array.push_back(_col);
         _res.row_array.push_back(_row);
+        _res.gain_array.push_back(_gain);
     }
     return _res;
 }
@@ -543,7 +585,8 @@ SJSV_eventbuilder::channel_mapping_info SJSV_eventbuilder::generate_mapping_coor
     if (_array_size != _raw_mapping_info.channel_num_array.size() ||
         _array_size != _raw_mapping_info.module_num_array.size() ||
         _array_size != _raw_mapping_info.col_array.size() ||
-        _array_size != _raw_mapping_info.row_array.size()) {
+        _array_size != _raw_mapping_info.row_array.size() ||
+        _array_size != _raw_mapping_info.gain_array.size()) {
         LOG(ERROR) << "Mapping array size not match";
         return _res;
     }
@@ -551,6 +594,9 @@ SJSV_eventbuilder::channel_mapping_info SJSV_eventbuilder::generate_mapping_coor
     // * Step 1. generate one-dimensional channel num
     for (auto i = 0; i < _array_size; i++)
         _res.uni_channel_array.push_back(_raw_mapping_info.board_num_array.at(i) * 64 + _raw_mapping_info.channel_num_array.at(i));
+
+    for (auto i = 0; i < _array_size; i++)
+        _res.is_HG_array.push_back(_raw_mapping_info.gain_array.at(i) == 'H');
 
     // * Step 2. generate x and y coordinate
     for (auto i = 0; i < _array_size; i++) {
@@ -650,6 +696,7 @@ SJSV_eventbuilder::mapped_event SJSV_eventbuilder::map_event(const std::vector<S
     auto _vec_x_coords  = _mapping_info.x_coords_array;
     auto _vec_y_coords  = _mapping_info.y_coords_array;
     auto _vec_cell_size = _mapping_info.cell_size_array;
+    auto _vec_Gain = _mapping_info.is_HG_array;
 
     for (auto i=0; i<_vec_parsed_frame.size(); i++) {
         auto _parsed_frame = _vec_parsed_frame.at(i);
@@ -659,7 +706,7 @@ SJSV_eventbuilder::mapped_event SJSV_eventbuilder::map_event(const std::vector<S
         int _index = std::find(_vec_uni_channel.begin(), _vec_uni_channel.end(), _uni_channel) - _vec_uni_channel.begin();
 
         if (_index == _vec_uni_channel.size()) {
-            LOG(ERROR) << "Cannot find channel " << _uni_channel << " in mapping info";
+            //LOG(ERROR) << "Cannot find channel " << _uni_channel << " in mapping info";
             continue;
         }
 
@@ -670,7 +717,24 @@ SJSV_eventbuilder::mapped_event SJSV_eventbuilder::map_event(const std::vector<S
         _res.x_coords_array.push_back(_x_coord);
         _res.y_coords_array.push_back(_y_coord);
         _res.cell_size_array.push_back(_cell_size);
-        _res.value_array.push_back(_adc);
+        if (_vec_Gain.at(_index)){
+            if (_uni_channel == 383){
+                 _res.value_array.push_back(0);
+                _res.value_LG_array.push_back(0);
+            } else {
+                _res.value_array.push_back(_adc);
+                _res.value_LG_array.push_back(0);
+            }
+        } else {
+            if (_uni_channel == 381) {
+                 _res.value_array.push_back(_adc*18);
+                _res.value_LG_array.push_back(0);
+            } else {
+                _res.value_array.push_back(0);
+                _res.value_LG_array.push_back(_adc);
+            }
+            
+        }
         // _res.error_array.push_back(sqrt(_adc));
     }
 
@@ -716,6 +780,9 @@ TH2D* SJSV_eventbuilder::quick_plot_mapped_event(const mapped_event &_mapped_eve
         auto _y_coord = _mapped_event.y_coords_array.at(i);
         auto _cell_size = _mapped_event.cell_size_array.at(i);
         auto _value = _mapped_event.value_array.at(i);
+        if (_value == 0) {
+            continue;
+        }
         // auto _log_value = log10(_value);
         // auto _error = _mapped_event.error_array.at(i);
         auto _x_offset = _cell_size / 2;
@@ -807,6 +874,24 @@ bool SJSV_eventbuilder::reconstruct_event(Double_t _threshold_time_ns){
                     _candidate_frames.clear();
                     continue;
                 }
+
+                auto _candidate_event_adc_sum = 0;
+                for (auto _frame_ptr : _candidate_frames) {
+                    _candidate_event_adc_sum += _frame_ptr->adc;
+                }
+                if (_candidate_event_adc_sum < 500) {
+                    LOG(WARNING) << "Event ADC sum too small, skipping this event";
+                    _candidate_frames.clear();
+                    continue;
+                }
+
+                auto _candidate_event_chn_num = _candidate_frames.size();
+                if (_candidate_event_chn_num < 20) {
+                    LOG(WARNING) << "Event channel number too small, skipping this event";
+                    _candidate_frames.clear();
+                    continue;
+                }
+
                 auto _parsed_event = new parsed_event();
                 _parsed_event->frames_ptr = _candidate_frames;
                 _parsed_event->id = _current_event_id;
@@ -818,6 +903,72 @@ bool SJSV_eventbuilder::reconstruct_event(Double_t _threshold_time_ns){
         }
         _candidate_frames.push_back(&vec_parsed_frame_ptr->at(_frame_index));
         _last_frame_time = _time_ns;
+    }
+
+    return true;
+}
+
+bool SJSV_eventbuilder::reconstruct_event_list(Double_t _threshold_time_ns){
+    int _seed_list_max_len = RECONSTRUCTION_LIST_LEN;
+    auto _parsed_frame_num = vec_parsed_frame_ptr->size();
+    if (_parsed_frame_num == 0) {
+        LOG(ERROR) << "Parsed frame vector is empty";
+        return false;
+    }
+    if (_threshold_time_ns < 0) {
+        LOG(ERROR) << "Threshold time is negative";
+        return false;
+    }
+    if (vec_parsed_event_ptr->size() != 0) {
+        LOG(WARNING) << "Parsed event is not empty, deleting old data";
+        vec_parsed_event_ptr->clear();
+    }
+
+    auto _too_small_event_cnt = 0;
+    uint32_t _current_event_id = 1;
+    std::vector<bool> _is_frame_used(_parsed_frame_num, false);
+    for (auto _frame_index=0; _frame_index<_parsed_frame_num; _frame_index++){
+        if (_is_frame_used.at(_frame_index)) {
+            continue;
+        }
+        // looking for hits within the time window
+        std::vector<parsed_frame*> _candidate_frames;
+        int _smaller_limit = _frame_index + RECONSTRUCTION_CHK_LEN;
+        if (_smaller_limit > _parsed_frame_num) {
+            _smaller_limit = _parsed_frame_num;
+        }
+        for (auto _search_index=_frame_index; _search_index<_smaller_limit; _search_index++){
+            if (_is_frame_used.at(_search_index)) {
+                continue;
+            }
+            auto _parsed_frame = vec_parsed_frame_ptr->at(_search_index);
+            auto _time_ns = _parsed_frame.time_ns;
+            if (abs(_time_ns - vec_parsed_frame_ptr->at(_frame_index).time_ns) < _threshold_time_ns){
+                _candidate_frames.push_back(&vec_parsed_frame_ptr->at(_search_index));
+                _is_frame_used.at(_search_index) = true;
+            }
+        }
+        // check if the candidate frames are legal
+        if (_candidate_frames.size() < MINIMUM_EVENT_HIT) {
+            _too_small_event_cnt++;
+            continue;
+        }
+
+        // save the event
+        auto _parsed_event = new parsed_event();
+        _parsed_event->frames_ptr = _candidate_frames;
+        _parsed_event->id = _current_event_id;
+        _current_event_id++;
+
+        vec_parsed_event_ptr->push_back(*_parsed_event);
+        // if (vec_parsed_event_ptr->size() == 1) {
+        //     LOG(DEBUG) << "Event " << _parsed_event->id << " reconstructed with " << _candidate_frames.size() << " frames";
+        //     for (auto _frame_ptr : vec_parsed_event_ptr->at(0).frames_ptr) {
+        //         LOG(DEBUG) << "Frame " << _frame_ptr->uni_channel << " " << _frame_ptr->adc << " " << _frame_ptr->time_ns;
+        //     }
+        // }
+
+        // print info
     }
 
     return true;
@@ -849,7 +1000,30 @@ TH1D* SJSV_eventbuilder::quick_plot_event_adc_hist(Int_t _bin_num, Double_t _bin
     for (auto _event: *vec_parsed_event_ptr) {
         Double_t _adc_sum = 0;
         for (auto _frame_ptr : _event.frames_ptr) {
-            _adc_sum += _frame_ptr->adc;
+            if (is_frame_HG(*_frame_ptr))
+                _adc_sum += _frame_ptr->adc;
+        }
+        _hist->Fill(_adc_sum);
+    }
+
+    _hist->SetStats(true);
+    _hist->GetXaxis()->SetTitle("ADC");
+    _hist->GetYaxis()->SetTitle("Event number");
+    return _hist;
+}
+
+TH1D* SJSV_eventbuilder::quick_plot_event_LG_adc_hist(Int_t _bin_num, Double_t _bin_low, Double_t _bin_high){
+    TH1D* _hist = new TH1D();
+    auto _hist_name = "event LG adc";
+    _hist->SetTitle(_hist_name);
+
+    _hist->SetBins(_bin_num, _bin_low, _bin_high);
+
+    for (auto _event: *vec_parsed_event_ptr) {
+        Double_t _adc_sum = 0;
+        for (auto _frame_ptr : _event.frames_ptr) {
+            if (!is_frame_HG(*_frame_ptr))
+                _adc_sum += _frame_ptr->adc;
         }
         _hist->Fill(_adc_sum);
     }
@@ -882,6 +1056,8 @@ TH2D* SJSV_eventbuilder::quick_plot_mapped_events_sum(void){
 
     for (auto _parsed_frame : *vec_parsed_frame_ptr) {
         auto _uni_channel = _parsed_frame.uni_channel;
+        if (_uni_channel > 20000)
+            LOG(ERROR) << "Channel number too large in plot: " << _uni_channel;
         auto _adc = _parsed_frame.adc;
         for (auto _frame_ptr : _summed_event.frames_ptr) {
             if (_frame_ptr->uni_channel == _uni_channel) {
@@ -901,5 +1077,80 @@ TH2D* SJSV_eventbuilder::quick_plot_mapped_events_sum(void){
 
     auto _mapped_event = map_event(_summed_event, *mapping_info_ptr);
 
+    for (auto _parsed_frame : *vec_parsed_frame_ptr) {
+        auto _uni_channel = _parsed_frame.uni_channel;
+        if (_uni_channel > 20000)
+            LOG(ERROR) << "Channel number too large in plot: " << _uni_channel;
+    }
+
     return quick_plot_mapped_event(_mapped_event, max_adc_sum);
-} 
+}
+
+TH2D* SJSV_eventbuilder::quick_plot_mapped_events_sum2(void){
+    // create a summed event
+    parsed_event _summed_event;
+
+    for (auto i=0; i<500; i++){
+        auto _event = vec_parsed_event_ptr->at(i);
+        for (auto _frame_ptr: _event.frames_ptr){
+            // see if the summed event has this channel
+            bool _has_channel = false;
+            int _frame_index = 0;
+            for (auto _frame_cnt=0; _frame_cnt<_summed_event.frames_ptr.size(); _frame_cnt++){
+                if (_summed_event.frames_ptr.at(_frame_cnt)->uni_channel == _frame_ptr->uni_channel){
+                    _has_channel = true;
+                    _frame_index = _frame_cnt;
+                    break;
+                }
+            }
+            if (!_has_channel){
+                parsed_frame* _parsed_frame = new parsed_frame();
+                _parsed_frame->uni_channel = _frame_ptr->uni_channel;
+                _parsed_frame->adc = _frame_ptr->adc;
+                _parsed_frame->time_ns = _frame_ptr->time_ns;
+                _parsed_frame->event_id = _frame_ptr->event_id;
+                _summed_event.frames_ptr.push_back(_parsed_frame);
+            } else {
+                _summed_event.frames_ptr.at(_frame_index)->adc += _frame_ptr->adc;
+            }
+        }
+    }
+
+    // Fill the rest channels with 1
+    for (auto i=0; i < 16*64; i++){
+        bool _has_channel = false;
+        for (auto _frame_ptr: _summed_event.frames_ptr){
+            if (_frame_ptr->uni_channel == i){
+                _has_channel = true;
+                break;
+            }
+        }
+        if (!_has_channel){
+            parsed_frame* _parsed_frame = new parsed_frame();
+            _parsed_frame->uni_channel = i;
+            _parsed_frame->adc = 1;
+            _parsed_frame->time_ns = 0;
+            _parsed_frame->event_id = 0;
+            _summed_event.frames_ptr.push_back(_parsed_frame);
+        }
+    }
+
+    auto max_adc_sum = 0;
+    for (auto _frame_ptr : _summed_event.frames_ptr) {
+        if (_frame_ptr->adc > max_adc_sum) {
+            max_adc_sum = _frame_ptr->adc;
+        }
+    }
+
+    LOG(INFO) << "Max ADC sum: " << max_adc_sum;
+
+    auto _mapped_event = map_event(_summed_event, *mapping_info_ptr);
+
+    for (auto _parsed_frame : *vec_parsed_frame_ptr) {
+        auto _uni_channel = _parsed_frame.uni_channel;
+        if (_uni_channel > 20000)
+            LOG(ERROR) << "Channel number too large in plot: " << _uni_channel;
+    }
+
+    return quick_plot_mapped_event(_mapped_event, max_adc_sum);
+}
