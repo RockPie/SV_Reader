@@ -3,7 +3,10 @@
 #include "TCanvas.h" 
 #include "TFile.h"
 #include "TTree.h"
-#include "Tlatex.h"
+#include "TLatex.h"
+#include "TF1.h"
+#include "TGraph.h"
+#include "csv.h"
 #include "easylogging++.h"
 #include "SJSV_pcapreader.h"
 #include "SJSV_eventbuilder.h"
@@ -34,7 +37,7 @@ int main(int argc, char** argv) {
     auto HG_adc_max = 0.02;
     auto LG_adc_max = 0.012;
 
-    int config = 5;
+    int config = 3;
 
     switch (config)
     {
@@ -105,7 +108,6 @@ int main(int argc, char** argv) {
     case 3: {
         config_name = "Hadron Energy Scan with 54.5 V bias";
         root_file_names = std::vector<std::string>{
-            "../tmp/analysis_rcsl_Run065v.root",
             "../tmp/analysis_rcsl_Run066v.root",
             "../tmp/analysis_rcsl_Run067v.root",
             "../tmp/analysis_rcsl_Run068v.root",
@@ -120,8 +122,7 @@ int main(int argc, char** argv) {
             150,
             100,
             80,
-            60,
-            40};
+            60};
         
         HG_n_bins = 1000;
         HG_min = 0;
@@ -211,6 +212,13 @@ int main(int argc, char** argv) {
 
     std::vector<std::vector<Double_t>*> HG_adc_list;
     std::vector<std::vector<Double_t>*> LG_adc_list;
+    std::vector<Double_t> HG_fit_mu;
+    std::vector<Double_t> HG_fit_sigma;
+    std::vector<Double_t> LG_fit_mu = {2250, 1700, 1500, 1000, 500, 150, 70, 0};
+    for (auto i=0; i < beam_energies.size(); i++){
+        LG_fit_mu[i] *= 18;
+    }
+    std::vector<Double_t> LG_fit_sigma;
 
     for (auto i=0; i < root_file_names.size(); i++){
         auto root_file_name = root_file_names[i];
@@ -222,8 +230,6 @@ int main(int argc, char** argv) {
         TTree* HGtree = (TTree*)gDirectory->Get("event_HG_adc");
         root_file->cd("LG");
         TTree* LGtree = (TTree*)gDirectory->Get("event_LG_adc");
-
-        // read vector<Double_t> from TTree
 
         std::vector<Double_t>* HG_adc = 0;
         std::vector<Double_t>* LG_adc = 0;
@@ -243,7 +249,6 @@ int main(int argc, char** argv) {
 
         HG_adc_list.push_back(HG_adc);
         LG_adc_list.push_back(LG_adc);
-
     }
 
     std::vector<TH1D*> HG_adc_hist_list;
@@ -303,11 +308,6 @@ int main(int argc, char** argv) {
         auto HG_adc_hist = new TH1D(Form("HG_adc_hist_%d", i), Form("HG_adc_hist_%d", i), HG_n_bins, HG_min, HG_max);
         auto LG_adc_hist = new TH1D(Form("LG_adc_hist_%d", i), Form("LG_adc_hist_%d", i), LG_n_bins, LG_min, LG_max);
 
-
-        // set title font
-        // HG_adc_hist->SetTitleFont(62);
-        // LG_adc_hist->SetTitleFont(62);
-
         // set title size
         HG_adc_hist->SetTitleSize(0.03);
         LG_adc_hist->SetTitleSize(0.03);
@@ -358,13 +358,38 @@ int main(int argc, char** argv) {
         auto _max_HG = HG_adc_hist->GetMaximum();
         auto _max_LG = LG_adc_hist->GetMaximum();
 
-        if (_max_HG > _global_max_HG){
+        if (_max_HG > _global_max_HG)
             _global_max_HG = _max_HG;
-        }
 
-        if (_max_LG > _global_max_LG){
+        if (_max_LG > _global_max_LG)
             _global_max_LG = _max_LG;
-        }
+
+        // fitting with gaussian
+        auto HG_mean = HG_adc_hist->GetMean();
+        auto HG_sigma = HG_adc_hist->GetRMS();
+        auto LG_mean = LG_adc_hist->GetMean();
+        auto LG_sigma = LG_adc_hist->GetRMS();
+
+        Double_t fit_area_offset = 0;
+        Double_t sigma_multiplier = 1;
+
+        TF1* HG_gaus = new TF1("HG_gaus", "gaus", HG_mean + fit_area_offset - sigma_multiplier*HG_sigma, HG_mean + fit_area_offset +    sigma_multiplier*HG_sigma);
+        TF1* LG_gaus = new TF1("LG_gaus", "gaus", LG_mean + fit_area_offset - sigma_multiplier*LG_sigma, LG_mean + fit_area_offset + sigma_multiplier*LG_sigma);
+
+        HG_gaus->SetLineColor(kGreen);
+        LG_gaus->SetLineColor(kGreen);
+        HG_gaus->SetLineWidth(3);
+        LG_gaus->SetLineWidth(3);
+        HG_gaus->SetLineStyle(2);
+        LG_gaus->SetLineStyle(2);
+
+        HG_adc_hist->Fit("HG_gaus", "R");
+        LG_adc_hist->Fit("LG_gaus", "R");
+
+        HG_fit_mu.push_back(HG_gaus->GetParameter(1));
+        HG_fit_sigma.push_back(HG_gaus->GetParameter(2));
+        //LG_fit_mu.push_back(LG_gaus->GetParameter(1) * 18);
+        //LG_fit_sigma.push_back(LG_gaus->GetParameter(2) * 18);
 
         HG_adc_hist_list.push_back(HG_adc_hist);
         LG_adc_hist_list.push_back(LG_adc_hist);
@@ -393,7 +418,6 @@ int main(int argc, char** argv) {
     }
     // set dashed grid line
     ch->SetGrid();
-
 
     text_line0->Draw();
     text_line1->Draw();
@@ -431,6 +455,69 @@ int main(int argc, char** argv) {
     water_mark->Draw();
     cl->SaveAs(Form("../pics/LG_adc_%d.png", config));
     cl->Close();
+
+    // print linearity plot
+    auto clinear = new TCanvas("linearity", "linearity", 1200, 800);
+    clinear->SetTitle(config_name.c_str());
+    std::vector<Double_t> HG_linearity_x;
+    std::vector<Double_t> LG_linearity_x;
+    for (auto i=0; i < beam_energies.size(); i++){
+        HG_linearity_x.push_back(Double_t(beam_energies[i]));
+        LG_linearity_x.push_back(Double_t(beam_energies[i]));
+    }
+    auto HG_linearity = new TGraph(HG_linearity_x.size(), &HG_linearity_x[0], &HG_fit_mu[0]);
+    auto LG_linearity = new TGraph(LG_linearity_x.size(), &LG_linearity_x[0], &LG_fit_mu[0]);
+
+    HG_linearity->SetMarkerStyle(20);
+    HG_linearity->SetMarkerSize(2);
+    HG_linearity->SetMarkerColor(kBlue);
+    HG_linearity->SetLineColor(kBlue);
+    HG_linearity->SetLineWidth(2);
+    HG_linearity->SetTitle("Linearity");
+
+    LG_linearity->SetMarkerStyle(20);
+    LG_linearity->SetMarkerSize(2);
+    LG_linearity->SetMarkerColor(kRed);
+    LG_linearity->SetLineColor(kRed);
+    LG_linearity->SetLineWidth(2);
+    LG_linearity->SetTitle("Linearity");
+
+    HG_linearity->GetXaxis()->SetTitle("Beam Energy [GeV]");
+    HG_linearity->GetYaxis()->SetTitle("ADC [ADC]");
+    HG_linearity->GetYaxis()->SetRangeUser(0, 40000);
+    HG_linearity->GetXaxis()->SetRangeUser(0, 400);
+
+    LG_linearity->GetXaxis()->SetTitle("Beam Energy [GeV]");
+    LG_linearity->GetYaxis()->SetTitle("ADC [ADC]");
+    LG_linearity->GetYaxis()->SetRangeUser(0, 40000);
+    LG_linearity->GetXaxis()->SetRangeUser(0, 400);
+
+    HG_linearity->Draw("APL");
+    LG_linearity->Draw("PL same");
+
+    // legend to top left
+    TLegend* linearity_legend = new TLegend(0.1, 0.7, 0.25, 0.9);
+    linearity_legend->SetTextFont(62);
+    linearity_legend->SetTextSize(0.03);
+    linearity_legend->SetTextAlign(32);
+    linearity_legend->AddEntry(HG_linearity, "High Gain", "p");
+    linearity_legend->AddEntry(LG_linearity, "Low Gain", "p");
+    linearity_legend->Draw();
+
+    clinear->SetGrid();
+    clinear->SaveAs(Form("../pics/linearity_%d.png", config));
+    clinear->Close();
+
+    // save HG mu to csv file
+    std::ofstream HG_mu_csv;
+    auto header = "Beam,ADC";
+    HG_mu_csv.open(Form("../tmp/HG_mu_%d.csv", config));
+    HG_mu_csv << header << std::endl;
+    for (auto i=0; i < beam_energies.size(); i++){
+        HG_mu_csv << beam_energies[i] << "," << HG_fit_mu[i] << std::endl;
+    }
+    HG_mu_csv.close();
+
 
     return 0;
 }
