@@ -182,10 +182,10 @@ bool SJSV_eventbuilder::save_parsed_data(const std::string &_filename_str) {
 
     TTree *tree = new TTree("tree", "tree");
 
-    uint16_t uni_channel;
-    double time_ns;
-    uint16_t adc;
-    uint32_t event_id;
+    Int_t uni_channel;
+    Double_t time_ns;
+    Int_t adc;
+    Int_t event_id;
 
     tree->Branch("uni_channel", &uni_channel, "uni_channel/I");
     tree->Branch("time_ns", &time_ns, "time_ns/D");
@@ -204,6 +204,58 @@ bool SJSV_eventbuilder::save_parsed_data(const std::string &_filename_str) {
     rootfile->Write();
     rootfile->Close();
 
+    return true;
+}
+
+bool SJSV_eventbuilder::load_parsed_data(const std::string &_filename_str){
+    if(_filename_str.empty()) {
+        LOG(ERROR) << "Filename is empty";
+        return false;
+    }
+
+    TFile *rootfile = new TFile(_filename_str.c_str(), "READ");
+    if (rootfile->IsZombie()) {
+        LOG(ERROR) << "Cannot open rootfile: " << _filename_str;
+        return false;
+    }
+
+    TTree *tree = (TTree*)rootfile->Get("tree");
+
+    if (tree == nullptr) {
+        LOG(ERROR) << "Cannot find tree in rootfile: " << _filename_str;
+        return false;
+    }
+
+    if (is_parsed_data_valid) {
+        vec_parsed_frame_ptr->clear();
+        is_parsed_data_valid = false;
+    }
+
+    Int_t uni_channel;
+    Double_t time_ns;
+    Int_t adc;
+    Int_t event_id;
+
+    tree->SetBranchAddress("uni_channel", &uni_channel);
+    tree->SetBranchAddress("time_ns", &time_ns);
+    tree->SetBranchAddress("adc", &adc);
+    tree->SetBranchAddress("event_id", &event_id);
+
+    int64_t nentries = tree->GetEntries();
+    for (int64_t ientry = 0; ientry < nentries; ientry++) {
+        tree->GetEntry(ientry);
+        parsed_frame _parsed_frame;
+        _parsed_frame.uni_channel = uni_channel;
+        _parsed_frame.time_ns = time_ns;
+        _parsed_frame.adc = adc;
+        _parsed_frame.event_id = event_id;
+        vec_parsed_frame_ptr->push_back(_parsed_frame);
+    }
+
+    LOG(INFO) << "Loaded " << nentries << " entries from " << _filename_str;
+
+    rootfile->Close();
+    is_parsed_data_valid = true;
     return true;
 }
 
@@ -517,6 +569,24 @@ bool SJSV_eventbuilder::is_frame_HG(const parsed_frame &_frame){
     auto _index = std::distance(_vec_uni_channel.begin(), _vec_index);
     return _vec_Gain.at(_index);
 }
+
+std::vector<Double_t> SJSV_eventbuilder::get_frame_coord(const parsed_frame &_frame){
+    std::vector<Double_t> _frame_coord = {-1, -1};
+    auto _uni_channel = _frame.uni_channel;
+    auto _vec_uni_channel = mapping_info_ptr->uni_channel_array;
+    auto _vec_x_coord = mapping_info_ptr->x_coords_array;
+    auto _vec_y_coord = mapping_info_ptr->y_coords_array;
+    auto _vec_index = std::find(_vec_uni_channel.begin(), _vec_uni_channel.end(), _uni_channel);
+    if (_vec_index == _vec_uni_channel.end()) {
+        // LOG(ERROR) << "Cannot find uni channel " << _uni_channel << " in mapping info";
+        return _frame_coord;
+    }
+    auto _index = std::distance(_vec_uni_channel.begin(), _vec_index);
+    _frame_coord.at(0) = _vec_x_coord.at(_index);
+    _frame_coord.at(1) = _vec_y_coord.at(_index);
+    return _frame_coord;
+}
+
 
 std::vector<Double_t> SJSV_eventbuilder::get_event_adc_sum(bool _is_HG){
     std::vector<Double_t> _vec_event_adc_sum;

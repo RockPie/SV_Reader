@@ -29,10 +29,10 @@ class SJSV_eventbuilder
 {
     public:
         struct parsed_frame {
-            uint16_t    uni_channel;
-            double      time_ns;
-            uint16_t    adc;
-            uint32_t    event_id = 0;
+            Int_t    uni_channel;
+            Double_t      time_ns;
+            Int_t    adc;
+            Int_t    event_id = 0;
         };
 
         struct parsed_event {
@@ -72,6 +72,14 @@ class SJSV_eventbuilder
 
         inline channel_mapping_info* get_mapping_info_ptr() {
             return mapping_info_ptr;
+        }
+
+        inline int get_parsed_hit_number() {
+            return vec_parsed_frame_ptr->size();
+        }
+
+        inline int get_parsed_event_number() {
+            return vec_parsed_event_ptr->size();
         }
 
         inline parsed_frame* frame_at(uint64_t _index){
@@ -126,8 +134,14 @@ class SJSV_eventbuilder
         // * @return: true if success, false if failed
         bool save_parsed_data(const std::string &_filename_str);
 
+        // * Load parsed data from rootfile
+        // * @param _filename_str: filename of rootfile
+        // * @return: true if success, false if failed
+        bool load_parsed_data(const std::string &_filename_str);
+
         std::vector<Double_t> get_event_adc_sum(bool _is_HG = true);
         bool is_frame_HG(const parsed_frame &_frame);
+        std::vector<Double_t> get_frame_coord(const parsed_frame &_frame);
 
         // * Quick browse parsed data by channel
         // * @param _channel: channel to be browsed
