@@ -169,6 +169,8 @@ class SJSV_eventbuilder
 
         TH2D* quick_plot_mapped_event(const mapped_event &_mapped_event, Double_t _max_adc = -1);
 
+        TH2D* plot_mapped_event_calib(const mapped_event &_mapped_event, const std::vector<Double_t> &_cell_id_vec, std::vector<Double_t> &_slope_vec, const std::vector<Double_t> &_intercept_vec, Double_t _max_adc = -1);
+
         TH2D* quick_plot_mapped_events_sum(void);
 
         TH2D* quick_plot_multiple_channels_hist(std::vector<uint16_t> _vec_channel, Int_t _bin_num, Double_t _bin_low, Double_t _bin_high);

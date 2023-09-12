@@ -788,24 +788,12 @@ SJSV_eventbuilder::mapped_event SJSV_eventbuilder::map_event(const std::vector<S
         _res.y_coords_array.push_back(_y_coord);
         _res.cell_size_array.push_back(_cell_size);
         if (_vec_Gain.at(_index)){
-            if (_uni_channel == 383){
-                 _res.value_array.push_back(0);
-                _res.value_LG_array.push_back(0);
-            } else {
-                _res.value_array.push_back(_adc);
-                _res.value_LG_array.push_back(0);
-            }
+            _res.value_array.push_back(_adc);
+            _res.value_LG_array.push_back(-1);
         } else {
-            if (_uni_channel == 381) {
-                 _res.value_array.push_back(_adc*18);
-                _res.value_LG_array.push_back(0);
-            } else {
-                _res.value_array.push_back(0);
-                _res.value_LG_array.push_back(_adc);
-            }
-            
+            _res.value_array.push_back(-1);
+            _res.value_LG_array.push_back(_adc);
         }
-        // _res.error_array.push_back(sqrt(_adc));
     }
 
     return _res;
@@ -868,6 +856,124 @@ TH2D* SJSV_eventbuilder::quick_plot_mapped_event(const mapped_event &_mapped_eve
     // list of color palettes: https://root.cern.ch/doc/master/classTColor.html
     _hist->SetStats(0);
     // show color bar
+    _hist->SetContour(100);
+    return _hist;
+}
+
+TH2D* SJSV_eventbuilder::plot_mapped_event_calib(const mapped_event &_mapped_event, const std::vector<Double_t> &_cell_id_vec, std::vector<Double_t> &_slope_vec, const std::vector<Double_t> &_intercept_vec, Double_t _max_adc){
+
+    LOG(INFO) << "length of cell id vec: " << _cell_id_vec.size();
+    LOG(INFO) << "length of slope vec: " << _slope_vec.size();
+    LOG(INFO) << "length of intercept vec: " << _intercept_vec.size();
+    TH2D *_hist = new TH2D();
+    auto _hist_name = "mapped event";
+    _hist->SetTitle(_hist_name);
+
+    auto _xaxis = _hist->GetXaxis();
+    _xaxis->SetTitle("X (pixel)");
+    auto _yaxis = _hist->GetYaxis();
+    _yaxis->SetTitle("Y (pixel)");
+
+    auto _x_bin_num = 105;
+    auto _y_bin_num = 105;
+    auto _x_bin_low = 0;
+    auto _x_bin_high = 105;
+    auto _y_bin_low = 0;
+    auto _y_bin_high = 105;
+
+    _hist->SetBins(_x_bin_num, _x_bin_low, _x_bin_high, _y_bin_num, _y_bin_low, _y_bin_high);
+
+    _hist->GetXaxis()->SetRangeUser(0, 104);
+    _hist->GetYaxis()->SetRangeUser(0, 104);
+
+    if (_max_adc > 0) {
+        _hist->SetMaximum(_max_adc);
+    }
+
+    std::vector<bool> _LG_available;
+    std::vector<Double_t> _id_vec;
+    std::vector<Double_t> _candidate_adc_vec;
+
+    for (auto i=0; i<_mapped_event.x_coords_array.size(); i++) {
+        auto _x_coord = _mapped_event.x_coords_array.at(i);
+        auto _y_coord = _mapped_event.y_coords_array.at(i);
+        auto _cell_size = _mapped_event.cell_size_array.at(i);
+        auto _value = _mapped_event.value_array.at(i);
+        auto _lg_value = _mapped_event.value_LG_array.at(i);
+        if (_value == -1) {
+            // * then it is LG
+            if (_lg_value > 0) {
+                // * then it is LG available
+                _id_vec.push_back(_x_coord*210 + _y_coord);
+                _candidate_adc_vec.push_back(_lg_value);
+                _LG_available.push_back(true);
+            }
+            continue;
+        }
+    }
+
+    // LOG(INFO) << "LG available: " << _LG_available.size();
+
+    for (auto i=0; i<_mapped_event.x_coords_array.size(); i++) {
+        auto _x_coord = _mapped_event.x_coords_array.at(i);
+        auto _y_coord = _mapped_event.y_coords_array.at(i);
+        auto _cell_size = _mapped_event.cell_size_array.at(i);
+        auto _value = _mapped_event.value_array.at(i);
+        auto _cell_id = _x_coord*210 + _y_coord;
+
+        auto _value_to_use = _value;
+        if (_value == -1) {
+            // * then it is HG
+            continue;
+        }
+        if (_value > 900) {
+            //LOG(INFO) << "HG value too large: " << _value << " at cell id " << _cell_id;
+            // print the cell id
+            // for (auto _id : _id_vec) {
+            //     LOG(INFO) << "Cell id: " << _id;
+            // }
+            // * search for LG
+            auto _index = std::find(_id_vec.begin(), _id_vec.end(), _cell_id) - _id_vec.begin();
+            if (_index == _id_vec.size()) {
+                // * then no LG available
+                continue;
+            } else {
+                auto _lg_value = _candidate_adc_vec.at(_index);
+                LOG(INFO) << "Found LG candidate: " << _candidate_adc_vec.at(_index);
+                // * then LG available
+                if (_LG_available.at(_index)) {
+                    // * then LG is available
+                    auto _slope_index = std::find(_cell_id_vec.begin(), _cell_id_vec.end(), _cell_id) - _cell_id_vec.begin();
+                    if (_slope_index == _cell_id_vec.size()) {
+                        // * then no slope available
+                        continue;
+                    }
+                    auto _slope = _slope_vec.at(_slope_index);
+                    auto _intercept = _intercept_vec.at(_slope_index);
+                    LOG(INFO) << "Substituting HG with LG: " << _value << " -> " << _lg_value << " with slope " << _slope << " and intercept " << _intercept << " at cell id " << _cell_id;
+                    _value_to_use = (_lg_value - _intercept) / _slope;
+                } else {
+                    // * then LG is not available
+                    continue;
+                }
+            }
+        }
+        // auto _log_value = log10(_value);
+        // auto _error = _mapped_event.error_array.at(i);
+        auto _x_offset = _cell_size / 2;
+        auto _y_offset = _cell_size / 2;
+        for (auto _x = _x_coord - _x_offset; _x < _x_coord + _x_offset; _x++) {
+            for (auto _y = _y_coord - _y_offset; _y < _y_coord + _y_offset; _y++) {
+                // LOG(INFO) << "Filling cell " << _x << ", " << _y << " with adc " << _value_to_use;
+                _hist->Fill(_x, _y, _value_to_use);
+            }
+        }
+    }
+    // set color palette
+    gStyle->SetPalette(kSunset);
+    // list of color palettes: https://root.cern.ch/doc/master/classTColor.html
+    _hist->SetStats(0);
+    //
     _hist->SetContour(100);
     return _hist;
 }

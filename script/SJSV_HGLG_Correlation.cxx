@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include "TCanvas.h" 
 #include "TVectorD.h"
+#include "TF1.h"
 #include "easylogging++.h"
 #include "SJSV_pcapreader.h"
 #include "SJSV_eventbuilder.h"
@@ -104,15 +105,14 @@ int main(int argc, char** argv) {
             }
         }
         for (auto cell_index=0; cell_index < cell_id_list.size(); cell_index++){
-            if (cell_hg_list.at(cell_index) == -1 || cell_lg_list.at(cell_index) == -1){
-                cell_id_list.erase(cell_id_list.begin() + cell_index);
-                cell_hg_list.erase(cell_hg_list.begin() + cell_index);
-                cell_lg_list.erase(cell_lg_list.begin() + cell_index);
+            if (cell_hg_list.at(cell_index) < 10 || cell_lg_list.at(cell_index) < 10){
+                continue;
+            } else {
+                cell_id_list_global.push_back(cell_id_list.at(cell_index));
+                cell_hg_list_global.push_back(cell_hg_list.at(cell_index));
+                cell_lg_list_global.push_back(cell_lg_list.at(cell_index));
             }
         }
-        cell_id_list_global.insert(cell_id_list_global.end(), cell_id_list.begin(),cell_id_list.end());
-        cell_hg_list_global.insert(cell_hg_list_global.end(), cell_hg_list.begin(),cell_hg_list.end());
-        cell_lg_list_global.insert(cell_lg_list_global.end(), cell_lg_list.begin(),cell_lg_list.end());
         cell_id_list.clear();
         cell_hg_list.clear();
         cell_lg_list.clear();
@@ -160,6 +160,13 @@ int main(int argc, char** argv) {
     auto analysis_file = new TFile(export_file_name, "RECREATE");
 
     // draw correlation
+    std::vector<Double_t> hg_lg_corr_slope;
+    std::vector<Double_t> hg_lg_corr_intercept;
+    std::vector<Double_t> hg_lg_corr_slope_error;
+    std::vector<Double_t> hg_lg_corr_intercept_error;
+    std::vector<Double_t> hg_lg_corr_x;
+    std::vector<Double_t> hg_lg_corr_y;
+
     for (auto cell_i=0; cell_i < cell_id_list_global_unique.size(); cell_i++) {
         auto canvas = new TCanvas(Form("canvas_%d", cell_i), Form("canvas_%d", cell_i), 800, 600);
         auto cell_id = cell_id_list_global_unique.at(cell_i);
@@ -189,6 +196,38 @@ int main(int argc, char** argv) {
         graph->GetXaxis()->SetLimits(0, 1024);
         graph->GetYaxis()->SetLimits(0, 200);
 
+        // check if the graph is empty in 650 - 1000
+        bool empty = true;
+        int point_cnt = 0;
+        for (auto i=0; i < cell_hg_list_size; i++){
+            if (cell_hg_list.at(i) > 650 && cell_hg_list.at(i) < 1000){
+                point_cnt++;
+                if (point_cnt > 5){
+                    empty = false;
+                    break;
+                }
+            }
+        }
+        if (!empty){
+            TF1 *f1 = new TF1("f1", "pol1", 650, 1000);
+            f1->SetLineWidth(3);
+            f1->SetLineColor(kRed);
+            graph->Fit("f1", "R");
+            auto fit_result = graph->GetFunction("f1");
+            auto fit_slope = fit_result->GetParameter(1);
+            auto fit_intercept = fit_result->GetParameter(0);
+            auto fit_slope_error = fit_result->GetParError(1);
+            auto fit_intercept_error = fit_result->GetParError(0);
+            if (fit_slope > 0.001 && fit_slope < 1000){
+                hg_lg_corr_slope.push_back(fit_slope);
+                hg_lg_corr_intercept.push_back(fit_intercept);
+                hg_lg_corr_x.push_back(cell_id%210);
+                hg_lg_corr_y.push_back(cell_id/210);
+                hg_lg_corr_slope_error.push_back(fit_slope_error);
+                hg_lg_corr_intercept_error.push_back(fit_intercept_error);
+            }
+        }
+
         graph->Draw("AP");
         canvas->Write();
         if (save_to_png){
@@ -196,6 +235,41 @@ int main(int argc, char** argv) {
         }
         canvas->Close();
     }
+
+    // save correlation to root file
+    analysis_file->cd();
+    analysis_file->mkdir("HG_LG_Correlation");
+    analysis_file->cd("HG_LG_Correlation");
+
+    auto hg_lg_corr_slope_array = new Double_t[hg_lg_corr_slope.size()];
+    auto hg_lg_corr_intercept_array = new Double_t[hg_lg_corr_intercept.size()];
+    auto hg_lg_corr_x_array = new Double_t[hg_lg_corr_x.size()];
+    auto hg_lg_corr_y_array = new Double_t[hg_lg_corr_y.size()];
+    auto hg_lg_corr_slope_error_array = new Double_t[hg_lg_corr_slope_error.size()];
+    auto hg_lg_corr_intercept_error_array = new Double_t[hg_lg_corr_intercept_error.size()];
+
+    for (auto i=0; i < hg_lg_corr_slope.size(); i++){
+        hg_lg_corr_slope_array[i] = hg_lg_corr_slope.at(i);
+        hg_lg_corr_intercept_array[i] = hg_lg_corr_intercept.at(i);
+        hg_lg_corr_x_array[i] = hg_lg_corr_x.at(i);
+        hg_lg_corr_y_array[i] = hg_lg_corr_y.at(i);
+        hg_lg_corr_slope_error_array[i] = hg_lg_corr_slope_error.at(i);
+        hg_lg_corr_intercept_error_array[i] = hg_lg_corr_intercept_error.at(i);
+    }
+
+    auto hg_lg_corr_slope_vector = new TVectorD(hg_lg_corr_slope.size(), hg_lg_corr_slope_array);
+    auto hg_lg_corr_intercept_vector = new TVectorD(hg_lg_corr_intercept.size(), hg_lg_corr_intercept_array);
+    auto hg_lg_corr_x_vector = new TVectorD(hg_lg_corr_x.size(), hg_lg_corr_x_array);
+    auto hg_lg_corr_y_vector = new TVectorD(hg_lg_corr_y.size(), hg_lg_corr_y_array);
+    auto hg_lg_corr_slope_error_vector = new TVectorD(hg_lg_corr_slope_error.size(), hg_lg_corr_slope_error_array);
+    auto hg_lg_corr_intercept_error_vector = new TVectorD(hg_lg_corr_intercept_error.size(), hg_lg_corr_intercept_error_array);
+
+    hg_lg_corr_slope_vector->Write("hg_lg_corr_slope");
+    hg_lg_corr_intercept_vector->Write("hg_lg_corr_intercept");
+    hg_lg_corr_x_vector->Write("hg_lg_corr_x");
+    hg_lg_corr_y_vector->Write("hg_lg_corr_y");
+    hg_lg_corr_slope_error_vector->Write("hg_lg_corr_slope_error");
+    hg_lg_corr_intercept_error_vector->Write("hg_lg_corr_intercept_error");
 
     analysis_file->Close();
     return 0;

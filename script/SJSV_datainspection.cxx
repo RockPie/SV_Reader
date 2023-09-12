@@ -12,7 +12,7 @@ int main(int argc, char** argv) {
     START_EASYLOGGINGPP(argc, argv);
     set_easylogger();
 
-    int run_number = 53;
+    int run_number = 37;
 
     int opt;
     while ((opt = getopt(argc, argv, "r:")) != -1){
