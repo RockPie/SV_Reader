@@ -37,12 +37,12 @@ int main(int argc, char** argv) {
     auto HG_adc_max = 0.02;
     auto LG_adc_max = 0.012;
 
-    int config = 3;
+    int config = 5;
 
     switch (config)
     {
     case 1: {
-        config_name = "Hadron Energy Scan with 55.5 V bias";
+        config_name = "Hadron Energy Scan with 55.5 V Bias";
         root_file_names = std::vector<std::string>{
            "../tmp/analysis_rcsl_Run050v.root",
            "../tmp/analysis_rcsl_Run051v.root",
@@ -76,7 +76,7 @@ int main(int argc, char** argv) {
         break;
     }
     case 2: {
-        config_name = "Electron Energy Scan with 55.5 V bias";
+        config_name = "Electron Energy Scan with 55.5 V Bias";
         root_file_names = std::vector<std::string>{
             "../tmp/analysis_rcsl_Run058v.root",
             "../tmp/analysis_rcsl_Run059v.root",
@@ -106,7 +106,7 @@ int main(int argc, char** argv) {
         break;
     }
     case 3: {
-        config_name = "Hadron Energy Scan with 54.5 V bias";
+        config_name = "Hadron Energy Scan with 54.5 V Bias";
         root_file_names = std::vector<std::string>{
             "../tmp/analysis_rcsl_Run066v.root",
             "../tmp/analysis_rcsl_Run067v.root",
@@ -138,7 +138,7 @@ int main(int argc, char** argv) {
         break;
     }
     case 4: {
-        config_name = "Electron Energy Scan with 54.5 V bias";
+        config_name = "Electron Energy Scan with 54.5 V Bias";
         root_file_names = std::vector<std::string>{
             "../tmp/analysis_rcsl_Run073v.root",
             "../tmp/analysis_rcsl_Run074v.root",
@@ -170,7 +170,7 @@ int main(int argc, char** argv) {
         break;
     }
     case 5: {
-        config_name = "Hadron Energy Scan with 56.5 V bias";
+        config_name = "Hadron Energy Scan with 56.5 V Bias";
         root_file_names = std::vector<std::string>{
             "../tmp/analysis_rcsl_Run037v.root",
             "../tmp/analysis_rcsl_Run022v.root",
@@ -219,6 +219,7 @@ int main(int argc, char** argv) {
         LG_fit_mu[i] *= 18;
     }
     std::vector<Double_t> LG_fit_sigma;
+    std::vector<Double_t> HG_fit_resolution;
 
     for (auto i=0; i < root_file_names.size(); i++){
         auto root_file_name = root_file_names[i];
@@ -316,8 +317,8 @@ int main(int argc, char** argv) {
         HG_adc_hist->SetTitleOffset(1.5);
         LG_adc_hist->SetTitleOffset(1.5);
 
-        HG_adc_hist->SetTitle("High Gain ADC");
-        LG_adc_hist->SetTitle("Low Gain ADC");
+        HG_adc_hist->SetTitle("High Gain ADC Distribution");
+        LG_adc_hist->SetTitle("Low Gain ADC Distribution");
 
         HG_adc_hist->SetStats(0);
         LG_adc_hist->SetStats(0);
@@ -371,7 +372,7 @@ int main(int argc, char** argv) {
         auto LG_sigma = LG_adc_hist->GetRMS();
 
         Double_t fit_area_offset = 0;
-        Double_t sigma_multiplier = 1;
+        Double_t sigma_multiplier = 2;
 
         TF1* HG_gaus = new TF1("HG_gaus", "gaus", HG_mean + fit_area_offset - sigma_multiplier*HG_sigma, HG_mean + fit_area_offset +    sigma_multiplier*HG_sigma);
         TF1* LG_gaus = new TF1("LG_gaus", "gaus", LG_mean + fit_area_offset - sigma_multiplier*LG_sigma, LG_mean + fit_area_offset + sigma_multiplier*LG_sigma);
@@ -383,13 +384,14 @@ int main(int argc, char** argv) {
         HG_gaus->SetLineStyle(2);
         LG_gaus->SetLineStyle(2);
 
-        HG_adc_hist->Fit("HG_gaus", "R");
+        HG_adc_hist->Fit("HG_gaus", "R", "", HG_mean + fit_area_offset - sigma_multiplier*HG_sigma, HG_mean + fit_area_offset +    sigma_multiplier*HG_sigma);
         LG_adc_hist->Fit("LG_gaus", "R");
 
         HG_fit_mu.push_back(HG_gaus->GetParameter(1));
         HG_fit_sigma.push_back(HG_gaus->GetParameter(2));
-        //LG_fit_mu.push_back(LG_gaus->GetParameter(1) * 18);
-        //LG_fit_sigma.push_back(LG_gaus->GetParameter(2) * 18);
+        HG_fit_resolution.push_back(HG_gaus->GetParameter(2) / HG_gaus->GetParameter(1));
+        // LG_fit_mu.push_back(LG_gaus->GetParameter(1) * 18);
+        // LG_fit_sigma.push_back(LG_gaus->GetParameter(2) * 18);
 
         HG_adc_hist_list.push_back(HG_adc_hist);
         LG_adc_hist_list.push_back(LG_adc_hist);
@@ -505,16 +507,43 @@ int main(int argc, char** argv) {
     linearity_legend->Draw();
 
     clinear->SetGrid();
-    clinear->SaveAs(Form("../pics/linearity_%d.png", config));
+    //clinear->SaveAs(Form("../pics/linearity_%d.png", config));
     clinear->Close();
+
+    auto cresolution = new TCanvas("resolution", "resolution", 1400, 800);
+    cresolution->SetTitle(config_name.c_str());
+    std::vector<Double_t> _beam_energies_double;
+    for (auto i=0; i < beam_energies.size(); i++){
+        _beam_energies_double.push_back(Double_t(beam_energies[i]));
+    }
+    auto resolution_graph = new TGraph(HG_fit_resolution.size(), &_beam_energies_double[0], &HG_fit_resolution[0]);
+    resolution_graph->SetMarkerStyle(20);
+    resolution_graph->SetMarkerSize(2);
+    resolution_graph->SetMarkerColor(kBlue);
+    resolution_graph->SetLineColor(kBlue);
+    resolution_graph->SetTitle("");
+
+    resolution_graph->GetXaxis()->SetRangeUser(0, 400);
+    resolution_graph->GetYaxis()->SetRangeUser(0.1, 0.4);
+    resolution_graph->GetXaxis()->SetLimits(0, 400);
+    resolution_graph->GetYaxis()->SetLimits(0.1, 0.4);
+
+    resolution_graph->GetXaxis()->SetTitle("ADC [ADC]");
+    resolution_graph->GetYaxis()->SetTitle("Resolution");
+
+    resolution_graph->Draw("AP");
+
+    cresolution->SetGrid();
+    cresolution->SaveAs(Form("../pics/resolution_%d.png", config));
+    cresolution->Close();
 
     // save HG mu to csv file
     std::ofstream HG_mu_csv;
-    auto header = "Beam,ADC";
+    auto header = "Beam,ADC,Sigma,Resolution";
     HG_mu_csv.open(Form("../tmp/HG_mu_%d.csv", config));
     HG_mu_csv << header << std::endl;
     for (auto i=0; i < beam_energies.size(); i++){
-        HG_mu_csv << beam_energies[i] << "," << HG_fit_mu[i] << std::endl;
+        HG_mu_csv << beam_energies[i] << "," << HG_fit_mu[i] << "," << HG_fit_sigma[i] << "," << HG_fit_resolution[i] << std::endl;
     }
     HG_mu_csv.close();
 

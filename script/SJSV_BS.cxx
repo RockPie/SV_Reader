@@ -6,6 +6,7 @@
 #include "TLatex.h"
 #include "TF1.h"
 #include "TGraph.h"
+#include "TGraphErrors.h"
 #include "TPaveText.h"
 #include "csv.h"
 #include "easylogging++.h"
@@ -32,14 +33,18 @@ int main(int argc, char** argv) {
     };
 
     std::vector<TGraph*> graphs;
+    std::vector<TGraph*> graphs_window;
     TLegend* legend = new TLegend(0.1, 0.7, 0.33, 0.9);
     legend->SetTextSize(0.035);
+    TLegend* legend_window = new TLegend(0.1, 0.7, 0.33, 0.9);
+    legend_window->SetTextSize(0.035);
 
     std::vector<Double_t> fit_par_0_list;
     std::vector<Double_t> fit_par_1_list;
     std::vector<Double_t> fit_par_0_err_list;
     std::vector<Double_t> fit_par_1_err_list;
 
+    int window_size = 3;
 
     for (int i = 0; i < bias_voltages.size(); i++) {
         io::CSVReader<2> _in(csv_file_names[i]);
@@ -51,6 +56,42 @@ int main(int argc, char** argv) {
             adc_v.push_back(adc);
         }
 
+        std::vector<Double_t> _p0_list;
+        std::vector<Double_t> _p1_list;
+        std::vector<Double_t> _energy_start_list;
+        std::vector<Double_t> _energy_end_list;
+        std::vector<Double_t> _energy_middle_list;
+        std::vector<Double_t> _energy_span_list;
+        for (auto i=0; i<=beam_v.size()-window_size; i++){
+            auto gtmp =  TGraph(window_size, &beam_v[i], &adc_v[i]);
+            auto ftmp = TF1("ftmp", "[0]*x+[1]", beam_v[i], beam_v[i+window_size-1]);
+            gtmp.Fit("ftmp", "R", "", beam_v[i], beam_v[i+window_size-1]);
+            auto _p0 = ftmp.GetParameter(0);
+            auto _p1 = ftmp.GetParameter(1);
+            _p0_list.push_back(_p0);
+            _p1_list.push_back(_p1);
+            _energy_end_list.push_back(beam_v[i+window_size-1]);
+            _energy_start_list.push_back(beam_v[i]);
+            _energy_middle_list.push_back((beam_v[i+window_size-1]+beam_v[i])/2);
+            _energy_span_list.push_back(abs(beam_v[i+window_size-1]-beam_v[i])/2);
+            LOG(INFO) << _p0 <<" "<<_p1;
+            LOG(INFO) << beam_v[i] << " " << beam_v[i+window_size-1];
+        }
+
+        LOG(INFO) << _p0_list.size();
+
+        // use span as x error
+        TGraph* graph_window = new TGraphErrors(_p0_list.size(), &_energy_middle_list[0], &_p0_list[0], &_energy_span_list[0], nullptr);
+        graph_window->SetMarkerSize(0);
+        graph_window->GetXaxis()->SetRangeUser(0,400);
+        graph_window->GetYaxis()->SetRangeUser(0,130);
+        graph_window->GetXaxis()->SetTitle("Beam Energy [GeV]");
+        graph_window->GetYaxis()->SetTitle("Fitted Slope [ADC/GeV]");
+        graph_window->SetTitle("");
+        // graph_window->GetYaxis()->SetTitleOffset(1.6);
+        graph_window->SetMarkerStyle(i+20);
+        graph_window->SetLineWidth(3);
+
         TGraph* graph = new TGraph(beam_v.size(), &beam_v[0], &adc_v[0]);
         TF1 *f1 = new TF1("f1", "[0]*x+[1]", 0, 400);
         f1->SetLineWidth(3);
@@ -61,10 +102,15 @@ int main(int argc, char** argv) {
             graph->SetMarkerColor(kBlue);
             f1->SetLineColor(kBlue);
             graph->SetMarkerSize(2);
+            graph_window->SetMarkerColor(kBlue);
+            //graph_window->SetMarkerSize(2);
+            graph_window->SetLineColor(kBlue);
         }
         else {
             graph->SetMarkerColor(i+1);
             f1->SetLineColor(i+1);
+            graph_window->SetMarkerColor(i+1);
+            graph_window->SetLineColor(i+1);
         }
         graph->SetLineWidth(2);
         graph->SetTitle("");
@@ -72,11 +118,7 @@ int main(int argc, char** argv) {
         graph->GetXaxis()->SetTitle("Beam Energy [GeV]");
         graph->GetYaxis()->SetTitle("ADC");
 
-        graph->GetXaxis()->SetRangeUser(0, 400);
-        graph->GetYaxis()->SetRangeUser(0, 40000);
-        // force set range
-        graph->GetXaxis()->SetLimits(0, 400);
-        graph->GetYaxis()->SetLimits(0, 40000);
+        
 
         // leave room for y axis title
         graph->GetYaxis()->SetTitleOffset(1.6);
@@ -87,16 +129,22 @@ int main(int argc, char** argv) {
         fit_par_0_err_list.push_back(f1->GetParError(0));
         fit_par_1_err_list.push_back(f1->GetParError(1));
 
-        // plot line with 59.51x - 172.657
-        
+        graph->GetXaxis()->SetRangeUser(0, 400);
+        graph->GetYaxis()->SetRangeUser(0, 40000);
+        // force set range
+        graph->GetXaxis()->SetLimits(0, 400);
+        graph->GetYaxis()->SetLimits(0, 40000);
 
+        // plot line with 59.51x - 172.657
         auto chi2 = f1->GetChisquare();
         auto ndf = f1->GetNDF();
         LOG(INFO) << "Chi2/NDF = " << chi2 << "/" << ndf << " = " << chi2/ndf;
 
         graphs.push_back(graph);
+        graphs_window.push_back(graph_window);
 
         legend->AddEntry(graph, Form("V_{bias} = %.1f V", bias_voltages[i]), "p");
+        legend_window->AddEntry(graph_window, Form("V_{bias} = %.1f V", bias_voltages[i]), "l");
 
     }
 
@@ -117,8 +165,10 @@ int main(int argc, char** argv) {
     latexInfo->SetTextFont(62);
     latexInfo->SetNDC();
     latexInfo->DrawLatex(0.35, 0.88, "ADC = a #times Beam Energy + b");
-
-    
+    latexInfo->SetTextSize(0.03);
+    latexInfo->DrawLatex(0.35, 0.83, "ADC Linearity of HG Bias Scan");
+    latexInfo->DrawLatex(0.35, 0.79, "Hadron Beam, SPS H4");
+    latexInfo->DrawLatex(0.35, 0.75, "FoCal-H Prototype 2");
 
     TLatex* latex1 = new TLatex();
     latex1->SetTextSize(0.035);
@@ -155,8 +205,35 @@ int main(int argc, char** argv) {
     water_mark->SetTextAngle(30);
     water_mark->DrawLatex(0.15, 0.25, "Very Preliminary");
     
-    c->SaveAs("../pics/HG_mu.png");
+    c->SaveAs("../pics/HG_lin.png");
     c->Close();
+
+    auto c2 = new TCanvas("c2", "c2", 800, 450);
+    c2->SetGrid();
+    LOG(INFO) << graphs_window.size();
+    for (int i = 0; i < graphs_window.size(); i++) {
+        if (i == 0) {
+            graphs_window[i]->Draw("AP");
+        } else {
+            graphs_window[i]->Draw("P same");
+        }
+    }
+    legend_window->SetY1(0.1);
+    legend_window->SetY2(0.35);
+    legend_window->Draw();
+    water_mark->DrawLatex(0.25, 0.25, "Very Preliminary");
+    auto text_vspace = 0.06;
+    auto start_y = 0.28;
+    latexInfo->SetTextSize(0.04);
+    latexInfo->DrawLatex(0.34, start_y, "ADC Response Slope with Window Size = 3");
+    start_y -= text_vspace;
+    latexInfo->DrawLatex(0.34, start_y, "Hadron Beam, SPS H4");
+    start_y -= text_vspace;
+    latexInfo->DrawLatex(0.34, start_y, "FoCal-H Prototype 2");
+    start_y -= text_vspace;
+
+    c2->SaveAs("../pics/HG_lin_window.png");
+    c2->Close();
     return 0;
 
 }

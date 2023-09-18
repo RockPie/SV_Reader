@@ -16,7 +16,7 @@ int main(int argc, char** argv) {
 
     int run_number = 37;
     bool save_to_rootfile = true;
-    bool save_to_png = false;
+    bool save_to_png = true;
     auto bcid_cycle     = uint8_t(25);
     auto tdc_slope      = uint8_t(60);
     Double_t reconstructed_threshold_time_ns = 10000;
@@ -100,6 +100,14 @@ int main(int argc, char** argv) {
     root_file->mkdir("Calibrated Hit Map");
     root_file->cd("Calibrated Hit Map");
 
+    std::vector<Double_t> original_event_sum;
+    std::vector<Double_t> calibrated_event_sum;
+    auto event_count = eventbuilder.get_parsed_event_number();
+
+    for (auto i=0; i<event_count; i++){
+        
+    }
+
     for (auto i=0; i<64; i++){
         auto event = eventbuilder.event_at(i);
         auto mapped_event = eventbuilder.map_event(event, *eventbuilder.get_mapping_info_ptr());
@@ -110,15 +118,12 @@ int main(int argc, char** argv) {
         event_map_calibrated->GetXaxis()->SetTitle("X");
         event_map_calibrated->GetYaxis()->SetTitle("Y");
 
-
-
         event_map_calibrated->Draw("colz");
 
         calibrated_event_canvas->SaveAs(Form("../tmp/Calibrated_Event_%d.png", i));
 
         calibrated_event_canvas->Close();
     }
-
 
     return 0;
 }

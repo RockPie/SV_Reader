@@ -852,7 +852,7 @@ TH2D* SJSV_eventbuilder::quick_plot_mapped_event(const mapped_event &_mapped_eve
         }
     }
     // set color palette
-    gStyle->SetPalette(kSunset);
+    gStyle->SetPalette(kBird);
     // list of color palettes: https://root.cern.ch/doc/master/classTColor.html
     _hist->SetStats(0);
     // show color bar
@@ -970,7 +970,7 @@ TH2D* SJSV_eventbuilder::plot_mapped_event_calib(const mapped_event &_mapped_eve
         }
     }
     // set color palette
-    gStyle->SetPalette(kSunset);
+    gStyle->SetPalette(kBird);
     // list of color palettes: https://root.cern.ch/doc/master/classTColor.html
     _hist->SetStats(0);
     //

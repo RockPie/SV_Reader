@@ -271,6 +271,18 @@ int main(int argc, char** argv) {
     hg_lg_corr_slope_error_vector->Write("hg_lg_corr_slope_error");
     hg_lg_corr_intercept_error_vector->Write("hg_lg_corr_intercept_error");
 
+    analysis_file->cd();
+
+    // draw calibrated slope and intercept histogram
+    auto hg_lg_corr_slope_hist = new TH1D("hg_lg_corr_slope_hist", "hg_lg_corr_slope_hist", 100, 0, 50);
+    auto hg_lg_corr_intercept_hist = new TH1D("hg_lg_corr_intercept_hist", "hg_lg_corr_intercept_hist", 100, 0, 10);
+    for (auto i=0; i < hg_lg_corr_slope.size(); i++){
+        hg_lg_corr_slope_hist->Fill(1 / hg_lg_corr_slope.at(i));
+        hg_lg_corr_intercept_hist->Fill(hg_lg_corr_intercept.at(i) * hg_lg_corr_slope.at(i));
+    }
+    hg_lg_corr_slope_hist->Write();
+    hg_lg_corr_intercept_hist->Write();
+
     analysis_file->Close();
     return 0;
 }
