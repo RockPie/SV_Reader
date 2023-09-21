@@ -566,6 +566,10 @@ bool SJSV_eventbuilder::is_frame_HG(const parsed_frame &_frame){
         // LOG(ERROR) << "Cannot find uni channel " << _uni_channel << " in mapping info";
         return false;
     }
+    if (mapping_info_ptr->is_HG_array.at(std::distance(_vec_uni_channel.begin(), _vec_index)))
+        return true;
+    else
+        return false;
     auto _index = std::distance(_vec_uni_channel.begin(), _vec_index);
     return _vec_Gain.at(_index);
 }
@@ -862,9 +866,9 @@ TH2D* SJSV_eventbuilder::quick_plot_mapped_event(const mapped_event &_mapped_eve
 
 TH2D* SJSV_eventbuilder::plot_mapped_event_calib(const mapped_event &_mapped_event, const std::vector<Double_t> &_cell_id_vec, std::vector<Double_t> &_slope_vec, const std::vector<Double_t> &_intercept_vec, Double_t _max_adc){
 
-    LOG(INFO) << "length of cell id vec: " << _cell_id_vec.size();
-    LOG(INFO) << "length of slope vec: " << _slope_vec.size();
-    LOG(INFO) << "length of intercept vec: " << _intercept_vec.size();
+    // LOG(INFO) << "length of cell id vec: " << _cell_id_vec.size();
+    // LOG(INFO) << "length of slope vec: " << _slope_vec.size();
+    // LOG(INFO) << "length of intercept vec: " << _intercept_vec.size();
     TH2D *_hist = new TH2D();
     auto _hist_name = "mapped event";
     _hist->SetTitle(_hist_name);
@@ -939,7 +943,7 @@ TH2D* SJSV_eventbuilder::plot_mapped_event_calib(const mapped_event &_mapped_eve
                 continue;
             } else {
                 auto _lg_value = _candidate_adc_vec.at(_index);
-                LOG(INFO) << "Found LG candidate: " << _candidate_adc_vec.at(_index);
+                //LOG(INFO) << "Found LG candidate: " << _candidate_adc_vec.at(_index);
                 // * then LG available
                 if (_LG_available.at(_index)) {
                     // * then LG is available
@@ -950,7 +954,7 @@ TH2D* SJSV_eventbuilder::plot_mapped_event_calib(const mapped_event &_mapped_eve
                     }
                     auto _slope = _slope_vec.at(_slope_index);
                     auto _intercept = _intercept_vec.at(_slope_index);
-                    LOG(INFO) << "Substituting HG with LG: " << _value << " -> " << _lg_value << " with slope " << _slope << " and intercept " << _intercept << " at cell id " << _cell_id;
+                    // LOG(INFO) << "Substituting HG with LG: " << _value << " -> " << _lg_value << " with slope " << _slope << " and intercept " << _intercept << " at cell id " << _cell_id;
                     _value_to_use = (_lg_value - _intercept) / _slope;
                 } else {
                     // * then LG is not available
@@ -976,6 +980,74 @@ TH2D* SJSV_eventbuilder::plot_mapped_event_calib(const mapped_event &_mapped_eve
     //
     _hist->SetContour(100);
     return _hist;
+}
+
+Double_t SJSV_eventbuilder::get_saturation_calib_sum(const SJSV_eventbuilder::mapped_event &_mapped_event, const std::vector<Double_t> &_cell_id_vec, std::vector<Double_t> &_slope_vec, const std::vector<Double_t> &_intercept_vec, Double_t _saturation_threshold){
+    Double_t _sum = 0;
+    std::vector<bool> _LG_available;
+    std::vector<Double_t> _id_vec;
+    std::vector<Double_t> _candidate_adc_vec;
+
+    for (auto i=0; i<_mapped_event.x_coords_array.size(); i++) {
+        auto _x_coord = _mapped_event.x_coords_array.at(i);
+        auto _y_coord = _mapped_event.y_coords_array.at(i);
+        auto _cell_size = _mapped_event.cell_size_array.at(i);
+        auto _value = _mapped_event.value_array.at(i);
+        auto _lg_value = _mapped_event.value_LG_array.at(i);
+        if (_value == -1) {
+            // * then it is LG
+            if (_lg_value > 0) {
+                // * then it is LG available
+                _id_vec.push_back(_x_coord*210 + _y_coord);
+                _candidate_adc_vec.push_back(_lg_value);
+                _LG_available.push_back(true);
+            }
+            continue;
+        }
+    }
+
+    for (auto i=0; i<_mapped_event.x_coords_array.size(); i++) {
+        auto _x_coord = _mapped_event.x_coords_array.at(i);
+        auto _y_coord = _mapped_event.y_coords_array.at(i);
+        auto _cell_size = _mapped_event.cell_size_array.at(i);
+        auto _value = _mapped_event.value_array.at(i);
+        auto _cell_id = _x_coord*210 + _y_coord;
+
+        auto _value_to_use = _value;
+        if (_value == -1) {
+            // * then it is HG
+            continue;
+        }
+        if (_value > _saturation_threshold) {
+            // * search for LG
+            auto _index = std::find(_id_vec.begin(), _id_vec.end(), _cell_id) - _id_vec.begin();
+            if (_index == _id_vec.size()) {
+                // * then no LG available
+                continue;
+            } else {
+                auto _lg_value = _candidate_adc_vec.at(_index);
+                //LOG(INFO) << "Found LG candidate: " << _candidate_adc_vec.at(_index);
+                // * then LG available
+                if (_LG_available.at(_index)) {
+                    // * then LG is available
+                    auto _slope_index = std::find(_cell_id_vec.begin(), _cell_id_vec.end(), _cell_id) - _cell_id_vec.begin();
+                    if (_slope_index == _cell_id_vec.size()) {
+                        // * then no slope available
+                        continue;
+                    }
+                    auto _slope = _slope_vec.at(_slope_index);
+                    auto _intercept = _intercept_vec.at(_slope_index);
+                    // LOG(INFO) << "Substituting HG with LG: " << _value << " -> " << _lg_value << " with slope " << _slope << " and intercept " << _intercept << " at cell id " << _cell_id;
+                    _value_to_use = (_lg_value - _intercept) / _slope;
+                } else {
+                    // * then LG is not available
+                    continue;
+                }
+            }
+        }
+        _sum += _value_to_use;
+    }
+    return _sum;
 }
 
 TH2D* SJSV_eventbuilder::quick_plot_multiple_channels_hist(std::vector<uint16_t> _vec_channel, Int_t _bin_num, Double_t _bin_low, Double_t _bin_high){
@@ -1329,4 +1401,17 @@ TH2D* SJSV_eventbuilder::quick_plot_mapped_events_sum2(void){
     }
 
     return quick_plot_mapped_event(_mapped_event, max_adc_sum);
+}
+
+Double_t SJSV_eventbuilder::get_event_hg_sum(const parsed_event &_event){
+    if (_event.frames_ptr.size() == 0) {
+        LOG(ERROR) << "Parsed event is empty";
+        return -1;
+    }
+    Double_t _adc_sum = 0;
+    for (auto _frame_ptr : _event.frames_ptr) {
+        if (is_frame_HG(*_frame_ptr))
+            _adc_sum += _frame_ptr->adc;
+    }
+    return _adc_sum;
 }

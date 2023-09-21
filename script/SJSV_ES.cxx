@@ -193,7 +193,7 @@ int main(int argc, char** argv) {
 
         HG_n_bins = 1000;
         HG_min = 0;
-        HG_max = 46000;
+        HG_max = 47000;
 
         LG_n_bins = 1000;
         LG_min = 0;

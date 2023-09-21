@@ -32,6 +32,18 @@ int main(int argc, char** argv) {
         "../tmp/HG_mu_3.csv",
     };
 
+    // std::vector<Double_t> bias_voltages = {
+    //     56.5,
+    //     54.5,
+    //     55.4,
+    // };
+
+    // std::vector<std::string> csv_file_names = {
+    //     "../tmp/Mixed_mu_1.csv",
+    //     "../tmp/Mixed_mu_3.csv",
+    //     "../tmp/Mixed_mu_2.csv",
+    // };
+
     std::vector<TGraph*> graphs;
     std::vector<TGraph*> graphs_window;
     TLegend* legend = new TLegend(0.1, 0.7, 0.33, 0.9);
@@ -84,7 +96,7 @@ int main(int argc, char** argv) {
         TGraph* graph_window = new TGraphErrors(_p0_list.size(), &_energy_middle_list[0], &_p0_list[0], &_energy_span_list[0], nullptr);
         graph_window->SetMarkerSize(0);
         graph_window->GetXaxis()->SetRangeUser(0,400);
-        graph_window->GetYaxis()->SetRangeUser(0,130);
+        graph_window->GetYaxis()->SetRangeUser(0,150);
         graph_window->GetXaxis()->SetTitle("Beam Energy [GeV]");
         graph_window->GetYaxis()->SetTitle("Fitted Slope [ADC/GeV]");
         graph_window->SetTitle("");
@@ -130,10 +142,10 @@ int main(int argc, char** argv) {
         fit_par_1_err_list.push_back(f1->GetParError(1));
 
         graph->GetXaxis()->SetRangeUser(0, 400);
-        graph->GetYaxis()->SetRangeUser(0, 40000);
+        graph->GetYaxis()->SetRangeUser(0, 45000);
         // force set range
         graph->GetXaxis()->SetLimits(0, 400);
-        graph->GetYaxis()->SetLimits(0, 40000);
+        graph->GetYaxis()->SetLimits(0, 45000);
 
         // plot line with 59.51x - 172.657
         auto chi2 = f1->GetChisquare();

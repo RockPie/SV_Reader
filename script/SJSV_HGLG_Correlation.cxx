@@ -14,7 +14,7 @@ int main(int argc, char** argv) {
     START_EASYLOGGINGPP(argc, argv);
     set_easylogger();
 
-    int run_number = 37;
+    int run_number = 29;
     bool save_to_rootfile = true;
     bool save_to_png = false;
     auto bcid_cycle     = uint8_t(25);
@@ -34,7 +34,7 @@ int main(int argc, char** argv) {
     }
 
     auto root_file_name = Form("../tmp/parsed_Run0%dv.root", run_number);
-    auto export_file_name = Form("../tmp/HL_Corr_Run0%dv.root", run_number);
+    auto export_file_name = Form("../tmp/HL_Correlation/HL_Corr_Run0%dv.root", run_number);
     std::string filename_mapping_csv = "../data/config/Mapping_tb2023Sep_VMM2.csv";
 
     LOG(INFO) << "Run number: " << run_number;

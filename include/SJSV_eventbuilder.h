@@ -90,6 +90,8 @@ class SJSV_eventbuilder
             return &vec_parsed_frame_ptr->at(_index);
         }
 
+        Double_t get_event_hg_sum(const parsed_event &_event);
+
         // * Load raw data from rootfile created by SJSV_pcapreader
         // * @param _filename_str: filename of rootfile
         // * @return: true if success, false if failed
@@ -170,6 +172,8 @@ class SJSV_eventbuilder
         TH2D* quick_plot_mapped_event(const mapped_event &_mapped_event, Double_t _max_adc = -1);
 
         TH2D* plot_mapped_event_calib(const mapped_event &_mapped_event, const std::vector<Double_t> &_cell_id_vec, std::vector<Double_t> &_slope_vec, const std::vector<Double_t> &_intercept_vec, Double_t _max_adc = -1);
+
+        Double_t get_saturation_calib_sum(const mapped_event &_mapped_event, const std::vector<Double_t> &_cell_id_vec, std::vector<Double_t> &_slope_vec, const std::vector<Double_t> &_intercept_vec, Double_t _saturation_threshold = 900);
 
         TH2D* quick_plot_mapped_events_sum(void);
 
