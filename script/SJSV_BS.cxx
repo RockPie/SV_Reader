@@ -15,6 +15,7 @@
 
 void set_easylogger(); // set easylogging++ configurations
 
+INITIALIZE_EASYLOGGINGPP
 
 int main(int argc, char** argv) {
     START_EASYLOGGINGPP(argc, argv);

@@ -23,8 +23,6 @@
 #define RECONSTRUCTION_CHK_LEN 10000
 #define MINIMUM_EVENT_HIT 5
 
-INITIALIZE_EASYLOGGINGPP
-
 class SJSV_eventbuilder
 {
     public:

@@ -23,7 +23,7 @@ include_directories(
     ${PCAPPP_INCLUDE_DIR}
 )
 
-add_library(SV_Reader SHARED
+add_library(SV_Reader STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/easylogging++.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SJSV_pcapreader.cxx
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SJSV_eventbuilder.cxx
