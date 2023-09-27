@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
     auto HG_adc_max = 0.02;
     auto LG_adc_max = 0.012;
 
-    int config = 5;
+    int config = 3;
 
     switch (config)
     {
@@ -109,13 +109,13 @@ int main(int argc, char** argv) {
     case 3: {
         config_name = "Hadron Energy Scan with 54.5 V Bias";
         root_file_names = std::vector<std::string>{
-            "../tmp/analysis_rcsl_Run066v.root",
-            "../tmp/analysis_rcsl_Run067v.root",
-            "../tmp/analysis_rcsl_Run068v.root",
-            "../tmp/analysis_rcsl_Run069v.root",
-            "../tmp/analysis_rcsl_Run070v.root",
-            "../tmp/analysis_rcsl_Run071v.root",
-            "../tmp/analysis_rcsl_Run072v.root",};
+            "../tmp/analysis_rcslr_Run066v.root",
+            "../tmp/analysis_rcslr_Run067v.root",
+            "../tmp/analysis_rcslr_Run068v.root",
+            "../tmp/analysis_rcslr_Run069v.root",
+            "../tmp/analysis_rcslr_Run070v.root",
+            "../tmp/analysis_rcslr_Run071v.root",
+            "../tmp/analysis_rcslr_Run072v.root",};
         beam_energies = std::vector<Int_t>{
             350,
             250,
@@ -173,14 +173,14 @@ int main(int argc, char** argv) {
     case 5: {
         config_name = "Hadron Energy Scan with 56.5 V Bias";
         root_file_names = std::vector<std::string>{
-            "../tmp/analysis_rcsl_Run037v.root",
-            "../tmp/analysis_rcsl_Run022v.root",
-            "../tmp/analysis_rcsl_Run023v.root",
-            "../tmp/analysis_rcsl_Run024v.root",
-            "../tmp/analysis_rcsl_Run025v.root",
-            "../tmp/analysis_rcsl_Run026v.root",
-            "../tmp/analysis_rcsl_Run027v.root",
-            "../tmp/analysis_rcsl_Run028v.root",};
+            "../tmp/analysis_rcslr_Run037v.root",
+            "../tmp/analysis_rcslr_Run022v.root",
+            "../tmp/analysis_rcslr_Run023v.root",
+            "../tmp/analysis_rcslr_Run024v.root",
+            "../tmp/analysis_rcslr_Run025v.root",
+            "../tmp/analysis_rcslr_Run026v.root",
+            "../tmp/analysis_rcslr_Run027v.root",
+            "../tmp/analysis_rcslr_Run028v.root",};
 
         beam_energies = std::vector<Int_t>{
             350,
@@ -334,8 +334,8 @@ int main(int argc, char** argv) {
         std::string LG_energy_legend_text = Form("%d GeV", beam_energies[i]);
 
         // add run info
-        HG_energy_legend_text += " (" + root_file_names[i].substr(24, 3) + ")";
-        LG_energy_legend_text += " (" + root_file_names[i].substr(24, 3) + ")";
+        HG_energy_legend_text += " (" + root_file_names[i].substr(25, 3) + ")";
+        LG_energy_legend_text += " (" + root_file_names[i].substr(25, 3) + ")";
 
         HG_energy_legend->AddEntry(HG_adc_hist, HG_energy_legend_text.c_str(), "l");
         LG_energy_legend->AddEntry(LG_adc_hist, LG_energy_legend_text.c_str(), "l");

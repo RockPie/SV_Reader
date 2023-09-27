@@ -334,7 +334,7 @@ TGraph* SJSV_eventbuilder::quick_plot_time_index(double _start_time, double _end
     // LOG(DEBUG) << "Plotting time index";
 
     auto _graph = new TGraph();
-    auto _graph_name = "reconstucted time vs frame index";
+    auto _graph_name = "reconstructed time vs frame index";
 
     _graph->SetTitle(_graph_name);
     _graph->SetName(_graph_name);
@@ -753,6 +753,23 @@ bool SJSV_eventbuilder::load_mapping_file(const std::string &_filename_str){
     this->mapping_info_ptr = new channel_mapping_info(_channel_mapping_info);
     LOG(INFO) << "Loaded mapping file: " << _filename_str;
     return true;
+}
+
+std::pair<Double_t, Double_t> SJSV_eventbuilder::frame_position(const parsed_frame &_frame, const SJSV_eventbuilder::channel_mapping_info &_mapping_inf){
+    auto _res = std::pair<Double_t, Double_t>();
+    auto _uni_channel = _frame.uni_channel;
+    auto _vec_uni_channel = _mapping_inf.uni_channel_array;
+    auto _vec_x_coord = _mapping_inf.x_coords_array;
+    auto _vec_y_coord = _mapping_inf.y_coords_array;
+    auto _vec_index = std::find(_vec_uni_channel.begin(), _vec_uni_channel.end(), _uni_channel);
+    if (_vec_index == _vec_uni_channel.end()) {
+        // LOG(ERROR) << "Cannot find uni channel " << _uni_channel << " in mapping info";
+        return _res;
+    }
+    auto _index = std::distance(_vec_uni_channel.begin(), _vec_index);
+    _res.first = _vec_x_coord.at(_index);
+    _res.second = _vec_y_coord.at(_index);
+    return _res;
 }
 
 SJSV_eventbuilder::mapped_event SJSV_eventbuilder::map_event(const std::vector<SJSV_eventbuilder::parsed_frame> &_vec_parsed_frame, const SJSV_eventbuilder::channel_mapping_info &_mapping_info){
@@ -1199,8 +1216,73 @@ bool SJSV_eventbuilder::reconstruct_event_list(Double_t _threshold_time_ns){
         // check if the candidate frames are legal
         if (_candidate_frames.size() < MINIMUM_EVENT_HIT) {
             _too_small_event_cnt++;
+            _candidate_frames.clear();
             continue;
         }
+
+        // check for repeated channel, if repeated, only keep the one with larger adc
+        std::vector<uint16_t> _vec_channel;
+        std::vector<uint16_t> _vec_adc;
+        for (auto _frame_ptr : _candidate_frames) {
+            _vec_channel.push_back(_frame_ptr->uni_channel);
+            _vec_adc.push_back(_frame_ptr->adc);
+        }
+        // sort the adc according to the channel
+        std::vector<uint16_t> _vec_channel_sorted;
+        std::vector<uint16_t> _vec_adc_sorted;
+        std::vector<uint16_t> _vec_index_sorted;
+        std::vector<uint16_t> _vec_index;
+        for (auto _index=0; _index<_vec_channel.size(); _index++) {
+            _vec_index.push_back(_index);
+        }
+
+        std::sort(_vec_index.begin(), _vec_index.end(), [&_vec_channel](size_t _i1, size_t _i2) {return _vec_channel[_i1] < _vec_channel[_i2];});
+        for (auto _index : _vec_index) {
+            _vec_channel_sorted.push_back(_vec_channel.at(_index));
+            _vec_adc_sorted.push_back(_vec_adc.at(_index));
+            _vec_index_sorted.push_back(_index);
+        }
+
+        // check if the channel is repeated
+        std::vector<uint16_t> _vec_frame_to_delete_index;
+        for (auto _index=0; _index<_vec_channel.size(); _index++) {
+            if (_index == 0) {
+                continue;
+            }
+            if (_vec_channel_sorted.at(_index) == _vec_channel_sorted.at(_index-1)) {
+                // if the previous one is already in the list, then delete this one 
+                if (std::find(_vec_frame_to_delete_index.begin(), _vec_frame_to_delete_index.end(), _vec_index_sorted.at(_index-1)) != _vec_frame_to_delete_index.end()) {
+                    _vec_frame_to_delete_index.push_back(_vec_index_sorted.at(_index));
+                }
+                else {
+                    if (_vec_adc_sorted.at(_index) > _vec_adc_sorted.at(_index-1)) {
+                        // keep the one with larger adc
+                        _vec_frame_to_delete_index.push_back(_vec_index_sorted.at(_index-1));
+                    } else {
+                        _vec_frame_to_delete_index.push_back(_vec_index_sorted.at(_index));
+                    }
+                }
+            }
+        }
+
+        std::unordered_set<uint16_t> _set_frame_to_delete_index(_vec_frame_to_delete_index.begin(), _vec_frame_to_delete_index.end());
+        std::vector<uint16_t> _sorted_delete_index(_set_frame_to_delete_index.begin(), _set_frame_to_delete_index.end());
+        std::sort(_sorted_delete_index.begin(), _sorted_delete_index.end(), std::greater<uint16_t>());
+
+        for (uint16_t index: _sorted_delete_index) {
+            if (index >= 0 && index < _candidate_frames.size()) {
+                _candidate_frames.erase(_candidate_frames.begin() + index);
+            }
+        }
+
+
+        // check if the event is too small
+        if (_candidate_frames.size() < MINIMUM_EVENT_HIT) {
+            _too_small_event_cnt++;
+            _candidate_frames.clear();
+            continue;
+        }
+
 
         // save the event
         auto _parsed_event = new parsed_event();
@@ -1409,9 +1491,34 @@ Double_t SJSV_eventbuilder::get_event_hg_sum(const parsed_event &_event){
         return -1;
     }
     Double_t _adc_sum = 0;
+    Double_t _adc_max = 0;
     for (auto _frame_ptr : _event.frames_ptr) {
-        if (is_frame_HG(*_frame_ptr))
+        if (is_frame_HG(*_frame_ptr)){
             _adc_sum += _frame_ptr->adc;
+            if (_frame_ptr->adc > _adc_max) {
+                _adc_max = _frame_ptr->adc;
+            }
+        }
     }
+    // _adc_sum -= _adc_max;
     return _adc_sum;
+}
+
+std::pair<Double_t, Double_t> SJSV_eventbuilder::get_event_hg_CoM(const parsed_event &_event){
+    if (_event.frames_ptr.size() == 0) {
+        LOG(ERROR) << "Parsed event is empty";
+        return std::make_pair(-1, -1);
+    }
+    Double_t _adc_sum = 0;
+    Double_t _adc_x_sum = 0;
+    Double_t _adc_y_sum = 0;
+    for (auto _frame_ptr : _event.frames_ptr) {
+        if (is_frame_HG(*_frame_ptr)){
+            _adc_sum += _frame_ptr->adc;
+            auto _frame_loc = this->frame_position(*_frame_ptr, *mapping_info_ptr);
+            _adc_x_sum += _frame_loc.first * _frame_ptr->adc;
+            _adc_y_sum += _frame_loc.second * _frame_ptr->adc;
+        }
+    }
+    return std::make_pair(_adc_x_sum/_adc_sum, _adc_y_sum/_adc_sum);
 }

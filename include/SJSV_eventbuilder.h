@@ -13,6 +13,7 @@
 #include "TH1.h"
 #include "TH2D.h"
 #include "TStyle.h"
+#include "TLine.h"
 
 #include "csv.h"
 
@@ -90,6 +91,8 @@ class SJSV_eventbuilder
 
         Double_t get_event_hg_sum(const parsed_event &_event);
 
+        std::pair<Double_t, Double_t> get_event_hg_CoM(const parsed_event &_event);
+
         // * Load raw data from rootfile created by SJSV_pcapreader
         // * @param _filename_str: filename of rootfile
         // * @return: true if success, false if failed
@@ -112,6 +115,7 @@ class SJSV_eventbuilder
         // ! This function will ignore error information
         mapped_event map_event(const std::vector<SJSV_eventbuilder::parsed_frame> &_vec_parsed_frame, const SJSV_eventbuilder::channel_mapping_info &_mapping_info);
         mapped_event map_event(const parsed_event &_parsed_event, const SJSV_eventbuilder::channel_mapping_info &_mapping_info);
+        std::pair<Double_t, Double_t> frame_position(const parsed_frame &_frame, const SJSV_eventbuilder::channel_mapping_info &_mapping_info);
 
         bool reconstruct_event(Double_t _threshold_time_ns);
 
@@ -187,6 +191,7 @@ class SJSV_eventbuilder
         std::vector<uint16_t> get_simple_pedestal();
 
         TH2D* quick_plot_mapped_events_sum2(void);
+
 
         bool reconstruct_event_list(Double_t _threshold_time_ns);
 

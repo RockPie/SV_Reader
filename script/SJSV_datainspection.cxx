@@ -13,7 +13,7 @@ int main(int argc, char** argv) {
     START_EASYLOGGINGPP(argc, argv);
     set_easylogger();
 
-    int run_number = 22;
+    int run_number = 37;
 
     int opt;
     while ((opt = getopt(argc, argv, "r:")) != -1){
@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
     // auto filename_id = filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1);
     // std::string filename_analysis_root = "../tmp/analysis_" + filename_id + ".root";
     auto filename_id = filename_pcap.substr(filename_pcap.find_last_of("/")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("/")-1) + "v";
-    std::string filename_analysis_root = "../tmp/analysis_rcsl_" + filename_id + ".root";
+    std::string filename_analysis_root = "../tmp/analysis_rcslr_" + filename_id + ".root";
     LOG(INFO) << "filename_analysis_root: " << filename_analysis_root;
     // split filename according to '_'
     // std::string filename_raw_root = "../tmp/raw_" + filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1) + ".root";

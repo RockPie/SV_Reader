@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
     START_EASYLOGGINGPP(argc, argv);
     set_easylogger();
 
-    int run_number = 29;
+    int run_number = 37;
     bool save_to_rootfile = true;
     bool save_to_png = false;
     auto bcid_cycle     = uint8_t(25);
