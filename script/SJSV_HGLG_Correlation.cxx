@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
     START_EASYLOGGINGPP(argc, argv);
     set_easylogger();
 
-    int run_number = 37;
+    int run_number = 73;
     bool save_to_rootfile = true;
     bool save_to_png = false;
     auto bcid_cycle     = uint8_t(25);
@@ -169,8 +169,8 @@ int main(int argc, char** argv) {
     std::vector<Double_t> hg_lg_corr_y;
 
     for (auto cell_i=0; cell_i < cell_id_list_global_unique.size(); cell_i++) {
-        auto canvas = new TCanvas(Form("canvas_%d", cell_i), Form("canvas_%d", cell_i), 800, 600);
         auto cell_id = cell_id_list_global_unique.at(cell_i);
+        auto canvas = new TCanvas(Form("canvas_%d", cell_id), Form("canvas_%d", cell_id), 800, 600);
         auto cell_hg_list = cell_hg_list_global_unique.at(cell_i);
         auto cell_lg_list = cell_lg_list_global_unique.at(cell_i);
         auto cell_hg_list_size = cell_hg_list.size();

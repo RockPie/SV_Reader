@@ -10,6 +10,7 @@
     - [a. Data parsing](#a-data-parsing)
     - [b. Mapping](#b-mapping)
     - [c. Quick plotting](#c-quick-plotting)
+  - [Data Inspector -- `SJSV_datainspection.cxx`](#data-inspector----sjsv_datainspectioncxx)
 
 
 ## Requirements
@@ -24,7 +25,7 @@
 
 This class is used to read the pcap file and extract the data from it. The typical usage is as follows:
 
-![Pcap Structure](docs/SV_Reader_Structure_Pcap.png)
+<img src="docs/SV_Reader_Structure_Pcap.png" width=600>
 
 ## Event Builder -- `SJSV_eventbuilder.cpp/h`
 
@@ -37,7 +38,7 @@ This class is used to build the events from the raw data stored by the Pcap Read
 
 Because the raw data contains timing information from different sources, the first step is to parse the data and form unified data structures.
 
-![Event Builder](docs/SV_Reader_Structure_event.png)
+<img src="docs/SV_Reader_Structure_event.png" width=600>
 
 ### b. Mapping
 
@@ -82,3 +83,26 @@ To help with the testing, serval plotting functions are implemented.
     qb_canvas_time_index->SaveAs("../pics/quick_browse_time.png");
     qb_canvas_time_index->Close();
   ```
+
+## Data Inspector -- `SJSV_datainspection.cxx`
+
+This is acutally a raw data reader. It reads the raw data from the pcap file and plot the most basic information. The output analysis file is named as `analysis_rcslr_Run<run number>v.root`, and the parsed hits are stored in `parsed_Run<run number>v.root`.
+
+!!! note 
+    `parsed_Run<run number>v.root` is necessary for most of the rest analysis.
+
+<img src="docs/analysis_root_structure.png" width=300x>
+
+In the `analysis_rcslr_Run<run number>v.root` file, you could find:
+
+- `all_hist`: The ADC distribution of all channels
+- `vmm_hist`: The ADC distribution divided by the VMM number
+- `time_index`: The time - frame index correlation of the chosen time window
+- `channel_hist`: The ADC distribution of individual channels
+- `event_chnnum_hist`: The number of channels in each event
+- `event_adc_hist`: The **high gain** ADC sum distribution
+- `event_adc_hist_low`: The **low gain** ADC sum distribution
+- `mapped_event_sum`: The summed hitting map of chosen events
+- `mapped_events`: Folder containing the hitting map of chosen events
+- `HG`: Distribution of all high gain ADC values
+- `LG`: Distribution of all low gain ADC values

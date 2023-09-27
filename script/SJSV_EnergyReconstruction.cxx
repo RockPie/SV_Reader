@@ -18,8 +18,8 @@ int main(int argc, char** argv) {
 
     int run_number = 34;
     bool save_to_rootfile = true;
-    bool save_detail_to_png = true;
-    bool save_comparison_to_png = true;
+    bool save_detail_to_png = false;
+    bool save_comparison_to_png = false;
     auto bcid_cycle     = uint8_t(25);
     auto tdc_slope      = uint8_t(60);
     Double_t reconstructed_threshold_time_ns = 10000;

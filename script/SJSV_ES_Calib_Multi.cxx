@@ -86,6 +86,7 @@ int main(int argc, char** argv) {
     };
 
     std::vector<TGraphErrors*> g_list;
+    std::vector<TGraphErrors*> g_list_mean;
 
     Double_t fit_info_box_x_min = 0.7;
     Double_t fit_info_box_x_max = 0.9;
@@ -175,8 +176,30 @@ int main(int argc, char** argv) {
             resolution_error_list.push_back(resolution_error);
         }
 
+        std::vector<Double_t> mean_mean_list;
+        std::vector<Double_t> mean_error_list;
+        LOG(INFO) << "Calculating mean and error ...";
+        for (int i = 0; i < mean_list.size(); i++) {
+            Double_t mean_mean = 0;
+            Double_t mean_error = 0;
+            for (int j = 0; j < mean_list[i].size(); j++) {
+                mean_mean += mean_list[i][j];
+            }
+            mean_mean /= mean_list[i].size();
+            mean_mean_list.push_back(mean_mean);
+            for (int j = 0; j < mean_list[i].size(); j++) {
+                mean_error += pow(mean_list[i][j] - mean_mean, 2);
+            }
+            mean_error /= mean_list[i].size();
+            mean_error = sqrt(mean_error);
+            mean_error_list.push_back(mean_error);
+        }
+
         auto _g = new TGraphErrors(fit_adc_list.size(), &fit_adc_list[0], &resolution_mean_list[0], 0, &resolution_error_list[0]);
         g_list.push_back(_g);
+
+        auto _g_mean = new TGraphErrors(fit_adc_list.size(), &fit_adc_list[0], &mean_mean_list[0], 0, &mean_error_list[0]);
+        g_list_mean.push_back(_g_mean);
     }
 
     
@@ -236,10 +259,6 @@ int main(int argc, char** argv) {
     info_box_fit_func_ref->SetFillColorAlpha(kWhite, 1);
     info_box_fit_func_ref->SetBorderSize(1);
     info_box_fit_func_ref->Draw();
-
-
-
-
 
     for (auto i = 0; i < g_list.size(); i++){
         auto _graph = g_list[i];
@@ -330,6 +349,44 @@ int main(int argc, char** argv) {
 
     c1->Close();
     delete c1;
+
+    auto c2 = new TCanvas("c2", "c2", 1200, 1200);
+    auto legend_mean = new TLegend(0.15, 0.7, 0.3, 0.9);
+
+    for (int i = 0; i < g_list_mean.size(); i++) {
+        auto _graph = g_list_mean[i];
+        _graph->SetTitle("Mean");
+        _graph->GetXaxis()->SetTitle("Beam Energy [GeV]");
+        _graph->GetYaxis()->SetTitle("Mean");
+        _graph->SetMarkerStyle(i + 21);
+        _graph->SetMarkerSize(1.8);
+        _graph->SetMarkerColor(file_color_list[i]);
+        _graph->SetLineColor(file_color_list[i]);
+        _graph->SetLineWidth(3);
+        _graph->GetXaxis()->SetRangeUser(0, 400);
+        _graph->GetYaxis()->SetRangeUser(0, 45000);
+        _graph->GetXaxis()->SetLimits(0, 400);
+        _graph->GetYaxis()->SetLimits(0, 45000);
+
+        legend_mean->AddEntry(_graph, file_legend[i].c_str(), "ple");
+        if (i == 0) {
+            _graph->Draw("AP");
+        } else {
+            _graph->Draw("P SAME");
+        }
+    }
+
+    legend_mean->Draw();
+
+    set_alice_style(gStyle);
+
+    c2->SetGrid();
+
+    c2->SaveAs("../pics/energy_mean.png");
+    LOG(INFO) << "Done";
+
+    c2->Close();
+    delete c2;
 
     return 0;
 }
