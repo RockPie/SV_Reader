@@ -1,5 +1,10 @@
 #include <iostream>
 #include <unistd.h>
+#include <string>
+#include <vector>
+#include <algorithm>
+// for stoi
+#include <cstdlib>
 #include "TCanvas.h" 
 #include "TVectorD.h"
 #include "TF1.h"
@@ -16,17 +21,38 @@ int main(int argc, char** argv) {
     set_easylogger();
 
     int run_number = 73;
-    bool save_to_rootfile = true;
     bool save_to_png = false;
     auto bcid_cycle     = uint8_t(25);
     auto tdc_slope      = uint8_t(60);
     Double_t reconstructed_threshold_time_ns = 10000;
 
+    auto root_file_name = std::string(Form("../tmp/parsed_Run0%dv.root", run_number));
+    auto export_file_name = Form("../tmp/HL_Correlation/HL_Corr_Run0%dv.root", run_number);
+    std::string filename_mapping_csv = "../data/config/Mapping_tb2023Sep_VMM2.csv";
+    std::string diretory_cell_pics = "../tmp/HL_Correlation";
+
     int opt;
-    while ((opt = getopt(argc, argv, "r:")) != -1){
+    while ((opt = getopt(argc, argv, "m:i:o:p:e:")) != -1){
         switch (opt){
-            case 'r':
-                run_number = atoi(optarg);
+            case 'm':
+                filename_mapping_csv = optarg;
+                break;
+            case 'i':
+                root_file_name = optarg;
+                break;
+            case 'o':
+                export_file_name = optarg;
+                break;
+            case 'p':
+                diretory_cell_pics = optarg;
+                break;
+            case 'e':
+                if (std::string(optarg) == "true"){
+                    save_to_png = true;
+                }
+                else {
+                    save_to_png = false;
+                }
                 break;
             default:
                 LOG(ERROR) << "Wrong arguments!";
@@ -34,10 +60,9 @@ int main(int argc, char** argv) {
         }
     }
 
-    auto root_file_name = Form("../tmp/parsed_Run0%dv.root", run_number);
-    auto export_file_name = Form("../tmp/HL_Correlation/HL_Corr_Run0%dv.root", run_number);
-    std::string filename_mapping_csv = "../data/config/Mapping_tb2023Sep_VMM2.csv";
-
+    auto run_number_str = root_file_name.substr(root_file_name.find("run")+3, 3);
+    LOG(INFO) << "Run number string: " << run_number_str;
+    run_number = std::stoi(run_number_str);
     LOG(INFO) << "Run number: " << run_number;
 
     SJSV_eventbuilder eventbuilder;
@@ -232,7 +257,7 @@ int main(int argc, char** argv) {
         graph->Draw("AP");
         canvas->Write();
         if (save_to_png){
-            canvas->SaveAs(Form("../tmp/HL_Correlation/HL_Corr_Run0%dv_CellID%d.png", run_number, cell_id));
+            canvas->SaveAs(Form((diretory_cell_pics + "/HL_Corr_Run0%dv_CellID%d.png").c_str(), run_number, cell_id));
         }
         canvas->Close();
     }

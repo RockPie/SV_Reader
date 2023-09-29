@@ -18,7 +18,6 @@ int main(int argc, char** argv) {
 
     int run_number = 34;
     bool save_to_rootfile = true;
-    bool save_detail_to_png = false;
     bool save_comparison_to_png = false;
     auto bcid_cycle     = uint8_t(25);
     auto tdc_slope      = uint8_t(60);
@@ -26,6 +25,11 @@ int main(int argc, char** argv) {
     Double_t hist_bin_number = 1000;
     Double_t hist_bin_min = 0;
     Double_t hist_bin_max = 14000;
+
+    auto root_file_name = Form("../tmp/parsed_Run0%dv.root", run_number);
+    auto export_file_name = Form("../tmp/ERcon_Run0%dv.root", run_number);
+    std::string filename_mapping_csv = "../data/config/Mapping_tb2023Sep_VMM2.csv";
+    auto hglg_file_name = Form("../tmp/HL_Correlation/HL_Corr_Run0%dv.root", run_number);
 
     int opt;
     while ((opt = getopt(argc, argv, "r:")) != -1){
@@ -38,15 +42,8 @@ int main(int argc, char** argv) {
                 return 1;
         }
     }
-
-    LOG(INFO) << "Run number: " << run_number;
-
-    auto root_file_name = Form("../tmp/parsed_Run0%dv.root", run_number);
-    auto export_file_name = Form("../tmp/ERcon_Run0%dv.root", run_number);
-    std::string filename_mapping_csv = "../data/config/Mapping_tb2023Sep_VMM2.csv";
-    auto hglg_file_name = Form("../tmp/HL_Correlation/HL_Corr_Run0%dv.root", run_number);
+    
     // auto hglg_file_name = "../tmp/HL_Correlation/HL_Corr_Run037v.root";
-
     SJSV_eventbuilder eventbuilder;
     eventbuilder.load_parsed_data(root_file_name);
     eventbuilder.load_mapping_file(filename_mapping_csv);
@@ -102,10 +99,12 @@ int main(int argc, char** argv) {
     LOG(DEBUG) << "Transformed TVectors to vectors.";
 
     auto root_file = new TFile(export_file_name, "RECREATE");
-    root_file->cd();
 
-    root_file->mkdir("Calibrated Hit Map");
-    root_file->cd("Calibrated Hit Map");
+    if (save_to_rootfile){
+        root_file->cd();
+        root_file->mkdir("Calibrated Hit Map");
+        root_file->cd("Calibrated Hit Map");
+    }
 
     std::vector<Double_t> original_event_sum;
     std::vector<Double_t> calibrated_event_sum;
@@ -120,7 +119,7 @@ int main(int argc, char** argv) {
         auto event_adc_sum_hg = eventbuilder.get_event_hg_sum(event);
         auto mapped_event = eventbuilder.map_event(event, *eventbuilder.get_mapping_info_ptr());
 
-        if (save_detail_to_png){
+        if (save_to_rootfile){
             auto calibrated_event_canvas = new TCanvas(Form("Calibrated Event %d", i), Form("Calibrated Event %d", i), 800, 600);
 
             auto event_map_calibrated = eventbuilder.plot_mapped_event_calib(mapped_event, hglg_cell_id, hglg_corr_slope_vec, hglg_corr_offset_vec);
@@ -130,7 +129,7 @@ int main(int argc, char** argv) {
 
             event_map_calibrated->Draw("colz");
 
-            calibrated_event_canvas->SaveAs(Form("../tmp/Calibrated_Event_%d.png", i));
+            calibrated_event_canvas->Write();
 
             calibrated_event_canvas->Close();
         }
@@ -138,6 +137,11 @@ int main(int argc, char** argv) {
         original_event_sum.push_back(event_adc_sum_hg);
         calibrated_event_sum.push_back(eventbuilder.get_saturation_calib_sum(mapped_event, hglg_cell_id, hglg_corr_slope_vec, hglg_corr_offset_vec, 900));
     }
+
+    if (save_to_rootfile){
+        root_file->Close();
+    }
+    
 
     auto energy_distribution_canvas = new TCanvas("Energy Distribution", "Energy Distribution", 800, 600);
     auto original_energy_distribution = new TH1D("Original Energy Distribution", "Original Energy Distribution", hist_bin_number, hist_bin_min, hist_bin_max);

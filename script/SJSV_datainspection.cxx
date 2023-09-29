@@ -12,14 +12,45 @@ INITIALIZE_EASYLOGGINGPP
 int main(int argc, char** argv) {
     START_EASYLOGGINGPP(argc, argv);
     set_easylogger();
+    
+    std::string script_info = "rcslrm";
+    // r -- reduction of repeated hits in one event
+    // m -- new mapping with VMM 0,1 and 4,5 swapped
 
-    int run_number = 30;
+    std::string filename_pcap = "../data/Run030";
+    // std::string filename_pcap = "../data/RunTest1";
+    // auto filename_id = filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1);
+    // std::string filename_analysis_root = "../tmp/analysis_" + filename_id + ".root";
+    auto filename_id = filename_pcap.substr(filename_pcap.find_last_of("/")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("/")-1) + "v";
+    std::string filename_analysis_root = "../tmp/analysis_" + script_info + "_" + filename_id + ".root";
+    // split filename according to '_'
+    // std::string filename_raw_root = "../tmp/raw_" + filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1) + ".root";
+    // std::string filename_parsed_root = "../tmp/parsed_" + filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1) + ".root";
+
+    std::string filename_raw_root = "../tmp/raw_" + filename_id + ".root";
+    std::string filename_parsed_root = "../tmp/parsed_" + filename_id + ".root";
+    std::string filename_mapping_csv = "../data/config/Mapping_tb2023Sep_VMM3.csv";
 
     int opt;
-    while ((opt = getopt(argc, argv, "r:")) != -1){
+    while ((opt = getopt(argc, argv, "i:m:d:r:p:a:")) != -1){
         switch (opt){
+            case 'i':
+                script_info = std::string(optarg);
+                break;
+            case 'm':
+                filename_mapping_csv = std::string(optarg);
+                break;
+            case 'd':
+                filename_pcap = std::string(optarg);
+                break;
             case 'r':
-                run_number = atoi(optarg);
+                filename_raw_root = std::string(optarg);
+                break;
+            case 'p':
+                filename_parsed_root = std::string(optarg);
+                break;
+            case 'a':
+                filename_analysis_root = std::string(optarg);
                 break;
             default:
                 LOG(ERROR) << "Wrong arguments!";
@@ -27,9 +58,13 @@ int main(int argc, char** argv) {
         }
     }
 
-    std::string script_info = "rcslrm";
-    // r -- reduction of repeated hits in one event
-    // m -- new mapping with VMM 0,1 and 4,5 swapped
+    LOG(INFO) << "script_info: " << script_info;
+    LOG(INFO) << "filename_mapping_csv: " << filename_mapping_csv;
+    LOG(INFO) << "filename_pcap: " << filename_pcap;
+    LOG(INFO) << "filename_raw_root: " << filename_raw_root;
+    LOG(INFO) << "filename_parsed_root: " << filename_parsed_root;
+    LOG(INFO) << "filename_analysis_root: " << filename_analysis_root;
+    
     
     bool save_to_rootfile = true;
     bool save_to_png = false;
@@ -52,19 +87,8 @@ int main(int argc, char** argv) {
     Int_t canvas_width = 1200;
     Int_t canvas_height = 1000;
 
-    std::string filename_pcap = "../data/Run0" + std::to_string(run_number);
-    // std::string filename_pcap = "../data/RunTest1";
-    // auto filename_id = filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1);
-    // std::string filename_analysis_root = "../tmp/analysis_" + filename_id + ".root";
-    auto filename_id = filename_pcap.substr(filename_pcap.find_last_of("/")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("/")-1) + "v";
-    std::string filename_analysis_root = "../tmp/analysis_" + script_info + "_" + filename_id + ".root";
-    LOG(INFO) << "filename_analysis_root: " << filename_analysis_root;
-    // split filename according to '_'
-    // std::string filename_raw_root = "../tmp/raw_" + filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1) + ".root";
-    // std::string filename_parsed_root = "../tmp/parsed_" + filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1) + ".root";
-    std::string filename_raw_root = "../tmp/raw_" + filename_id + ".root";
-    std::string filename_parsed_root = "../tmp/parsed_" + filename_id + ".root";
-    std::string filename_mapping_csv = "../data/config/Mapping_tb2023Sep_VMM3.csv";
+
+    
 
     // * -------------------------------------------------------------------------------------------
     SJSV_pcapreader pcapreader(filename_pcap);

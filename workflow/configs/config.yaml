@@ -1,3 +1,7 @@
 path_data_directory: 'data'
+path_config_data_directory: 'data/config'
 path_pics_directroy: 'pics'
 path_exec_directory: 'build'
+path_dump_directory: 'workflow/dump'
+
+name_mapping_file: "Mapping_tb2023Sep_VMM3.csv"
