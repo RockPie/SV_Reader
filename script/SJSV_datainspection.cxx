@@ -13,7 +13,7 @@ int main(int argc, char** argv) {
     START_EASYLOGGINGPP(argc, argv);
     set_easylogger();
 
-    int run_number = 37;
+    int run_number = 30;
 
     int opt;
     while ((opt = getopt(argc, argv, "r:")) != -1){
@@ -26,6 +26,10 @@ int main(int argc, char** argv) {
                 return 1;
         }
     }
+
+    std::string script_info = "rcslrm";
+    // r -- reduction of repeated hits in one event
+    // m -- new mapping with VMM 0,1 and 4,5 swapped
     
     bool save_to_rootfile = true;
     bool save_to_png = false;
@@ -53,14 +57,14 @@ int main(int argc, char** argv) {
     // auto filename_id = filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1);
     // std::string filename_analysis_root = "../tmp/analysis_" + filename_id + ".root";
     auto filename_id = filename_pcap.substr(filename_pcap.find_last_of("/")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("/")-1) + "v";
-    std::string filename_analysis_root = "../tmp/analysis_rcslr_" + filename_id + ".root";
+    std::string filename_analysis_root = "../tmp/analysis_" + script_info + "_" + filename_id + ".root";
     LOG(INFO) << "filename_analysis_root: " << filename_analysis_root;
     // split filename according to '_'
     // std::string filename_raw_root = "../tmp/raw_" + filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1) + ".root";
     // std::string filename_parsed_root = "../tmp/parsed_" + filename_pcap.substr(filename_pcap.find_last_of("_")+1, filename_pcap.find_last_of(".")-filename_pcap.find_last_of("_")-1) + ".root";
     std::string filename_raw_root = "../tmp/raw_" + filename_id + ".root";
     std::string filename_parsed_root = "../tmp/parsed_" + filename_id + ".root";
-    std::string filename_mapping_csv = "../data/config/Mapping_tb2023Sep_VMM2.csv";
+    std::string filename_mapping_csv = "../data/config/Mapping_tb2023Sep_VMM3.csv";
 
     // * -------------------------------------------------------------------------------------------
     SJSV_pcapreader pcapreader(filename_pcap);

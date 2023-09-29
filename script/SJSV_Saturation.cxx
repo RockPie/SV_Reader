@@ -16,7 +16,7 @@ int main(int argc, char** argv) {
     START_EASYLOGGINGPP(argc, argv);
     set_easylogger();
 
-    int run_number = 46;
+    int run_number = 64;
     bool save_to_rootfile = true;
     bool save_detail_to_png = false;
     bool save_comparison_to_png = true;
@@ -285,7 +285,7 @@ int main(int argc, char** argv) {
 
     // * --- Plot event CoM distribution ---
     auto event_CoM_canvas = new TCanvas("Event CoM", "Event CoM", 1250, 1200);
-    TH2D* event_CoM_hist = new TH2D("Event CoM", "Event CoM", 210, 0, 105, 210, 0, 105);
+    TH2D* event_CoM_hist = new TH2D("Event CoM", "Event CoM", 140, 35, 70, 140, 35, 70);
 
     for (auto i=0; i<original_event_CoM.size(); i++){
         event_CoM_hist->Fill(original_event_CoM[i].first, original_event_CoM[i].second);

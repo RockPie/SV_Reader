@@ -1,0 +1,3 @@
+path_data_directory: 'data'
+path_pics_directroy: 'pics'
+path_exec_directory: 'build'

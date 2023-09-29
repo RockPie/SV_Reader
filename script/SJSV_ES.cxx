@@ -27,6 +27,12 @@ int main(int argc, char** argv) {
     std::string common_info_line2 = "SPS H4 Beam Test";
     std::string common_info_line3 = "September 2023";
 
+    std::vector<Int_t> run_module_number;
+
+    const std::vector<Int_t> center_module_number = {5};
+    const std::vector<Int_t> corner_module_number = {1,3,7,9};
+    const std::vector<Int_t> edge_module_number = {2,4,6,8};
+
     auto HG_n_bins = 1000;
     auto HG_min = 0;
     auto HG_max = 26000;
@@ -38,7 +44,7 @@ int main(int argc, char** argv) {
     auto HG_adc_max = 0.02;
     auto LG_adc_max = 0.012;
 
-    int config = 3;
+    int config = 9;
 
     switch (config)
     {
@@ -206,28 +212,158 @@ int main(int argc, char** argv) {
         break;
     }
 
+    case 6: {
+        config_name = "Hadron Position Scan of 350 GeV";
+        root_file_names = std::vector<std::string>{
+            "../tmp/analysis_rcslr_Run035v.root",
+            "../tmp/analysis_rcslr_Run030v.root",
+            "../tmp/analysis_rcslr_Run031v.root",
+            "../tmp/analysis_rcslr_Run036v.root",
+            "../tmp/analysis_rcslr_Run037v.root",
+            "../tmp/analysis_rcslr_Run032v.root",
+            "../tmp/analysis_rcslr_Run029v.root",
+            "../tmp/analysis_rcslr_Run034v.root",
+            "../tmp/analysis_rcslr_Run033v.root"};
+
+        run_module_number = std::vector<Int_t>{
+            1,2,3,4,5,6,7,8,9};
+
+        HG_n_bins = 1000;
+        HG_min = 0;
+        HG_max = 50000;
+
+        LG_n_bins = 500;
+        LG_min = 0;
+        LG_max = 5500;
+
+        HG_adc_max = 0.007;
+        LG_adc_max = 0.014;
+        LOG(INFO) << "File names: " << root_file_names[0];
+        break;
+    }
+
+    case 7: {
+        config_name = "Electron Position Scan of 100 GeV";
+        root_file_names = std::vector<std::string>{
+            "../tmp/analysis_rcslr_Run040v.root",
+            "../tmp/analysis_rcslr_Run045v.root",
+            "../tmp/analysis_rcslr_Run044v.root",
+            "../tmp/analysis_rcslr_Run039v.root",
+            "../tmp/analysis_rcslr_Run038v.root",
+            "../tmp/analysis_rcslr_Run043v.root",
+            "../tmp/analysis_rcslr_Run046v.root",
+            "../tmp/analysis_rcslr_Run041v.root",
+            "../tmp/analysis_rcslr_Run042v.root"};
+
+        run_module_number = std::vector<Int_t>{
+            1,2,3,4,5,6,7,8,9};
+
+        HG_n_bins = 2000;
+        HG_min = 0;
+        HG_max = 12000;
+
+        LG_n_bins = 5000;
+        LG_min = 0;
+        LG_max = 2500;
+
+        HG_adc_max = 0.0045;
+        LG_adc_max = 0.007;
+        LOG(INFO) << "File names: " << root_file_names[0];
+        break;
+    }
+    case 8: {
+        config_name = "Hadron Gain Scan of 1 mV/fC with 54.5 V Bias";
+        root_file_names = std::vector<std::string>{
+           "../tmp/analysis_rcslr_Run081v.root",
+           "../tmp/analysis_rcslr_Run084v.root",
+           "../tmp/analysis_rcslr_Run085v.root",};
+        beam_energies = std::vector<Int_t>{
+            350,
+            250,
+            60};
+        
+        HG_n_bins = 1000;
+        HG_min = 0;
+        HG_max = 50000;
+
+        LG_n_bins = 1000;
+        LG_min = 0;
+        LG_max = 4000;
+
+        HG_adc_max = 0.014;
+        LG_adc_max = 0.016;
+        break;
+    }
+
+    case 9: {
+        config_name = "Electron Gain Scan of 1 mV/fC with 54.5 V Bias";
+        root_file_names = std::vector<std::string>{
+           "../tmp/analysis_rcslr_Run086v.root",
+           "../tmp/analysis_rcslr_Run087v.root",};
+        beam_energies = std::vector<Int_t>{
+            250,
+            20};
+        
+        HG_n_bins = 1000;
+        HG_min = 0;
+        HG_max = 25000;
+
+        LG_n_bins = 1000;
+        LG_min = 0;
+        LG_max = 4000;
+
+        HG_adc_max = 0.023;
+        LG_adc_max = 0.035;
+        break;
+
+    }
+
     default:
         break;
     }
 
+    std::vector<Int_t> color_list;
+    Int_t _center_cnt = 0;
+    Int_t _corner_cnt = 0;
+    Int_t _edge_cnt = 0;
+    if (run_module_number.size() > 0){
+        for (auto module_number : run_module_number){
+            if (std::find(center_module_number.begin(),     center_module_number.end(), module_number) !=   center_module_number.end()){
+                color_list.push_back(kRed);
+                _center_cnt++;
+            }
+            else if (std::find(corner_module_number.begin(),    corner_module_number.end(), module_number) !=  corner_module_number.end()){
+                color_list.push_back(kOrange + 1 +  _corner_cnt*2);
+                _corner_cnt++;
+            }
+            else if (std::find(edge_module_number.begin(),  edge_module_number.end(), module_number) !=  edge_module_number.end()){
+                color_list.push_back(kGreen + 1 + _edge_cnt);
+                _edge_cnt++;
+            }
+            else{
+                color_list.push_back(kBlack);
+            }
+        }
+    }
 
     std::vector<std::vector<Double_t>*> HG_adc_list;
     std::vector<std::vector<Double_t>*> LG_adc_list;
     std::vector<Double_t> HG_fit_mu;
     std::vector<Double_t> HG_fit_sigma;
     std::vector<Double_t> LG_fit_mu = {2250, 1700, 1500, 1000, 500, 150, 70, 0};
-    for (auto i=0; i < beam_energies.size(); i++){
-        LG_fit_mu[i] *= 18;
-    }
+
+    // for (auto i=0; i < beam_energies.size(); i++){
+    //     LG_fit_mu[i] *= 18;
+    // }
     std::vector<Double_t> LG_fit_sigma;
     std::vector<Double_t> HG_fit_resolution;
 
-    for (auto i=0; i < root_file_names.size(); i++){
-        auto root_file_name = root_file_names[i];
-        auto beam_energy = beam_energies[i];
-        LOG(INFO) << "Processing " << root_file_name << " ...";
 
-        TFile* root_file = new TFile(root_file_name.c_str(), "READ");
+    for (auto i=0; i < root_file_names.size(); i++){
+        auto root_file_name = root_file_names[i].c_str();
+        auto beam_energy = beam_energies[i];
+
+        TFile* root_file = new TFile(root_file_name, "READ");
         root_file->cd("HG");
         TTree* HGtree = (TTree*)gDirectory->Get("event_HG_adc");
         root_file->cd("LG");
@@ -253,16 +389,18 @@ int main(int argc, char** argv) {
         LG_adc_list.push_back(LG_adc);
     }
 
+    LOG(INFO) << "HG_adc_list size: " << HG_adc_list.size();
+
     std::vector<TH1D*> HG_adc_hist_list;
     std::vector<TH1D*> LG_adc_hist_list;
 
     // top right legend
-    TLegend* HG_energy_legend = new TLegend(0.735, 0.5, 0.9, 0.9);
-    TLegend* LG_energy_legend = new TLegend(0.735, 0.5, 0.9, 0.9);
+    TLegend* HG_energy_legend = new TLegend(0.75, 0.5, 0.9, 0.9);
+    TLegend* LG_energy_legend = new TLegend(0.75, 0.5, 0.9, 0.9);
     HG_energy_legend->SetTextFont(62);
     LG_energy_legend->SetTextFont(62);
-    HG_energy_legend->SetTextSize(0.03);
-    LG_energy_legend->SetTextSize(0.03);
+    // HG_energy_legend->SetTextSize(0.03);
+    // LG_energy_legend->SetTextSize(0.03);
     HG_energy_legend->SetTextAlign(32);
     LG_energy_legend->SetTextAlign(32);
 
@@ -273,10 +411,10 @@ int main(int argc, char** argv) {
     water_mark->SetTextSize(0.15);
 
         // add text to the plot
-    TLatex* text_line0 = new TLatex(0.73, 0.85, config_name.c_str());
-    TLatex* text_line1 = new TLatex(0.73, 0.8, common_info_line1.c_str());
-    TLatex* text_line2 = new TLatex(0.73, 0.75, common_info_line2.c_str());
-    TLatex* text_line3 = new TLatex(0.73, 0.7, common_info_line3.c_str());
+    TLatex* text_line0 = new TLatex(0.75, 0.85, config_name.c_str());
+    TLatex* text_line1 = new TLatex(0.75, 0.8, common_info_line1.c_str());
+    TLatex* text_line2 = new TLatex(0.75, 0.75, common_info_line2.c_str());
+    TLatex* text_line3 = new TLatex(0.75, 0.7, common_info_line3.c_str());
 
     // right align
     text_line0->SetTextAlign(31);
@@ -324,14 +462,23 @@ int main(int argc, char** argv) {
         HG_adc_hist->SetStats(0);
         LG_adc_hist->SetStats(0);
 
-        HG_adc_hist->GetXaxis()->SetTitle("ADC");
-        LG_adc_hist->GetXaxis()->SetTitle("ADC");
+        HG_adc_hist->GetXaxis()->SetTitle("ADC Sum");
+        LG_adc_hist->GetXaxis()->SetTitle("ADC Sum");
 
         HG_adc_hist->GetYaxis()->SetTitle("Normalized Counts");
         LG_adc_hist->GetYaxis()->SetTitle("Normalized Counts");
 
-        std::string HG_energy_legend_text = Form("%d GeV", beam_energies[i]);
-        std::string LG_energy_legend_text = Form("%d GeV", beam_energies[i]);
+        std::string HG_energy_legend_text;
+        std::string LG_energy_legend_text;
+
+        if (beam_energies.size() > 0){
+            HG_energy_legend_text = Form("%d GeV", beam_energies[i]);
+            LG_energy_legend_text = Form("%d GeV", beam_energies[i]);
+        } else {
+            HG_energy_legend_text = Form("Module %d", run_module_number[i]);
+            LG_energy_legend_text = Form("Module %d", run_module_number[i]);
+        }
+        
 
         // add run info
         HG_energy_legend_text += " (" + root_file_names[i].substr(25, 3) + ")";
@@ -380,13 +527,13 @@ int main(int argc, char** argv) {
 
         HG_gaus->SetLineColor(kGreen);
         LG_gaus->SetLineColor(kGreen);
-        HG_gaus->SetLineWidth(3);
-        LG_gaus->SetLineWidth(3);
+        HG_gaus->SetLineWidth(2);
+        LG_gaus->SetLineWidth(2);
         HG_gaus->SetLineStyle(2);
         LG_gaus->SetLineStyle(2);
 
-        HG_adc_hist->Fit("HG_gaus", "R", "", HG_mean + fit_area_offset - sigma_multiplier*HG_sigma, HG_mean + fit_area_offset +    sigma_multiplier*HG_sigma);
-        LG_adc_hist->Fit("LG_gaus", "R");
+        // HG_adc_hist->Fit("HG_gaus", "R", "", HG_mean + fit_area_offset - sigma_multiplier*HG_sigma, HG_mean + fit_area_offset +    sigma_multiplier*HG_sigma);
+        // LG_adc_hist->Fit("LG_gaus", "R");
 
         HG_fit_mu.push_back(HG_gaus->GetParameter(1));
         HG_fit_sigma.push_back(HG_gaus->GetParameter(2));
@@ -410,13 +557,18 @@ int main(int argc, char** argv) {
     ch->SetTitle(config_name.c_str());
     for (auto _hist_index=0; _hist_index < HG_adc_hist_list.size(); _hist_index++){
         auto _hist = HG_adc_hist_list[_hist_index];
-        _hist->SetLineColor(_hist_index+1);
-        _hist->SetLineWidth(5);
-        _hist->SetMarkerSize(5);
+        if (run_module_number.size() > 0){
+            _hist->SetLineColor(color_list[_hist_index]);
+        }
+        else {
+            _hist->SetLineColor(_hist_index+1);
+        }
+        _hist->SetLineWidth(3);
+        //_hist->SetMarkerSize(5);
         if (_hist_index == 0){
-            _hist->Draw();
+            _hist->Draw("l");
         }else{
-            _hist->Draw("same");
+            _hist->Draw("l same");
         }
     }
     // set dashed grid line
@@ -439,13 +591,18 @@ int main(int argc, char** argv) {
     //cl->SetLogy();
     for (auto _hist_index=0; _hist_index < LG_adc_hist_list.size(); _hist_index++){
         auto _hist = LG_adc_hist_list[_hist_index];
-        _hist->SetLineColor(_hist_index+1);
-        _hist->SetLineWidth(5);
+        if (run_module_number.size() > 0){
+            _hist->SetLineColor(color_list[_hist_index]);
+        }
+        else {
+            _hist->SetLineColor(_hist_index+1);
+        }
+        _hist->SetLineWidth(4);
         _hist->SetMarkerSize(5);
         if (_hist_index == 0){
             _hist->Draw();
         }else{
-            _hist->Draw("same");
+        _hist->Draw("same");
         }
     }
     cl->SetGrid();
@@ -535,13 +692,13 @@ int main(int argc, char** argv) {
     resolution_graph->Draw("AP");
 
     cresolution->SetGrid();
-    cresolution->SaveAs(Form("../pics/resolution_%d.png", config));
+    cresolution->SaveAs(Form("../pics/PSresolution_%d.png", config));
     cresolution->Close();
 
     // save HG mu to csv file
     std::ofstream HG_mu_csv;
     auto header = "Beam,ADC,Sigma,Resolution";
-    HG_mu_csv.open(Form("../tmp/HG_mu_%d.csv", config));
+    HG_mu_csv.open(Form("../tmp/PS_mu_%d.csv", config));
     HG_mu_csv << header << std::endl;
     for (auto i=0; i < beam_energies.size(); i++){
         HG_mu_csv << beam_energies[i] << "," << HG_fit_mu[i] << "," << HG_fit_sigma[i] << "," << HG_fit_resolution[i] << std::endl;

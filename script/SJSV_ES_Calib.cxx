@@ -30,6 +30,8 @@ int main(int argc, char** argv) {
         1, 2, 3
     };
 
+    const bool enable_fit = false;
+
     std::string common_info_line1 = "FoCal-H Prototype 2";
     std::string common_info_line2 = "SPS H4 Beam Test";
     std::string common_info_line3 = "September 2023";
@@ -39,7 +41,7 @@ int main(int argc, char** argv) {
     auto Mixed_max = 26000;
 
     auto Mixed_adc_max = 0.02;
-    int config = 3;
+    int config = 7;
 
     switch (config)
     {
@@ -182,10 +184,46 @@ int main(int argc, char** argv) {
 
         break;
     }
+    case 6: {
+        config_name = "Hadron Gain Scan of 1 mV/fC with 54.5 V Bias";
+        csv_file_names = std::vector<std::string>{
+            "../tmp/HL_Correlation/Mixed_ADC_sum_run081.csv",
+            "../tmp/HL_Correlation/Mixed_ADC_sum_run084.csv",
+            "../tmp/HL_Correlation/Mixed_ADC_sum_run085.csv",};
+        beam_energies = std::vector<Int_t>{
+            350,
+            250,
+            60};
+            
+        Mixed_n_bins = 1000;
+        Mixed_min = 0;
+        Mixed_max = 55000;
+        Mixed_adc_max = 0.014;
+
+        break;
+    }
+    case 7: {
+        config_name = "Electron Gain Scan of 1 mV/fC with 54.5 V Bias";
+        csv_file_names = std::vector<std::string>{
+            "../tmp/HL_Correlation/Mixed_ADC_sum_run086.csv",
+            "../tmp/HL_Correlation/Mixed_ADC_sum_run087.csv",};
+        beam_energies = std::vector<Int_t>{
+            250,
+            20};
+            
+        Mixed_n_bins = 1000;
+        Mixed_min = 0;
+        Mixed_max = 55000;
+        Mixed_adc_max = 0.02;
+
+        break;
+    }
+
 
     default:
         break;
     }
+
 
 
     std::vector<std::vector<Double_t>*> Mixed_adc_list;
@@ -258,96 +296,134 @@ int main(int argc, char** argv) {
     
     auto _global_max_Mixed = 0.0;
 
- 
+    if (enable_fit){
+        LOG(INFO) << "Fitting ...";
+        for (auto _fit_offset: fit_area_offset_list){
+            for (auto _fit_sigma: sigma_multiplier_list) {
 
-    for (auto _fit_offset: fit_area_offset_list){
-        for (auto _fit_sigma: sigma_multiplier_list) {
+                for (auto i=0; i < Mixed_adc_list.size(); i++){
+                    auto Mixed_adc = Mixed_adc_list[i];
 
-            for (auto i=0; i < Mixed_adc_list.size(); i++){
-                auto Mixed_adc = Mixed_adc_list[i];
+                    auto Mixed_adc_hist = new TH1D(Form("Mixed_adc_hist_%d", i),        Form("Mixed_adc_hist_%d", i), Mixed_n_bins, Mixed_min,      Mixed_max);
 
-                auto Mixed_adc_hist = new TH1D(Form("Mixed_adc_hist_%d", i),        Form("Mixed_adc_hist_%d", i), Mixed_n_bins, Mixed_min,      Mixed_max);
+                    // set title size
+                    Mixed_adc_hist->SetTitleSize(0.03);
+                    Mixed_adc_hist->SetTitleOffset(1.5);
+                    Mixed_adc_hist->SetTitle("Mixed ADC Distribution");
+                    Mixed_adc_hist->SetStats(0);
+                    Mixed_adc_hist->GetXaxis()->SetTitle("ADC");
+                    Mixed_adc_hist->GetYaxis()->SetTitle("Normalized Counts");
 
-                // set title size
-                Mixed_adc_hist->SetTitleSize(0.03);
-                Mixed_adc_hist->SetTitleOffset(1.5);
-                Mixed_adc_hist->SetTitle("Mixed ADC Distribution");
-                Mixed_adc_hist->SetStats(0);
-                Mixed_adc_hist->GetXaxis()->SetTitle("ADC");
-                Mixed_adc_hist->GetYaxis()->SetTitle("Normalized Counts");
+                    std::string Mixed_energy_legend_text = Form("%d GeV",       beam_energies[i]);
 
-                std::string Mixed_energy_legend_text = Form("%d GeV",       beam_energies[i]);
+                    // add run info
+                    Mixed_energy_legend_text += " (" + csv_file_names[i].substr     (39, 3) + ")";
+                    Mixed_energy_legend->AddEntry(Mixed_adc_hist,       Mixed_energy_legend_text.c_str(), "l");
 
-                // add run info
-                Mixed_energy_legend_text += " (" + csv_file_names[i].substr     (39, 3) + ")";
-                Mixed_energy_legend->AddEntry(Mixed_adc_hist,       Mixed_energy_legend_text.c_str(), "l");
+                    // move to right to show y axis
+                    Mixed_adc_hist->GetYaxis()->SetTitleOffset(1.5);
 
-                // move to right to show y axis
-                Mixed_adc_hist->GetYaxis()->SetTitleOffset(1.5);
+                    LOG(DEBUG) << "Mixed_adc->size(): " << Mixed_adc->size();
+                    for (auto j=0; j < Mixed_adc->size(); j++){
+                        Mixed_adc_hist->Fill(Mixed_adc->at(j));
+                    // LOG(DEBUG) << "Mixed_adc->at(j): " << Mixed_adc->at(j);
+                    }
 
-                LOG(DEBUG) << "Mixed_adc->size(): " << Mixed_adc->size();
-                for (auto j=0; j < Mixed_adc->size(); j++){
-                    Mixed_adc_hist->Fill(Mixed_adc->at(j));
-                   // LOG(DEBUG) << "Mixed_adc->at(j): " << Mixed_adc->at(j);
+                    // normalize
+                    auto Mixed_integral = Mixed_adc_hist->Integral();
+
+                    Mixed_adc_hist->Scale(1.0/Mixed_integral);
+
+                    auto _max_Mixed = Mixed_adc_hist->GetMaximum();
+
+                    if (_max_Mixed > _global_max_Mixed)
+                        _global_max_Mixed = _max_Mixed;
+
+                    // fitting with gaussian
+                    auto Mixed_mean = Mixed_adc_hist->GetMean();
+                    auto Mixed_sigma = Mixed_adc_hist->GetRMS();
+                    auto Mixed_max = Mixed_adc_hist->GetMaximum();
+
+                    // TF1* Mixed_gaus = new TF1("Mixed_gaus", "gaus",      Mixed_mean + fit_area_offset - sigma_multiplier*Mixed_sigma,        Mixed_mean + fit_area_offset +         sigma_multiplier*Mixed_sigma);
+                    TF1* CrystalBall = new TF1("CrystalBall", "crystalball");
+
+                    // set initial parameters
+                    CrystalBall->SetParameter(0, Mixed_max);
+                    CrystalBall->SetParameter(1, Mixed_mean);
+                    CrystalBall->SetParameter(2, Mixed_sigma);
+                    CrystalBall->SetParameter(3, 1.5);
+                    CrystalBall->SetParameter(4, 0.5);
+
+                    // Mixed_gaus->SetLineColor(kGreen);
+                    // Mixed_gaus->SetLineWidth(3);
+                    // Mixed_gaus->SetLineStyle(2);
+
+                    CrystalBall->SetLineColor(kRed);
+                    CrystalBall->SetLineWidth(3);
+                    CrystalBall->SetLineStyle(2);
+
+                    // Mixed_adc_hist->Fit("Mixed_gaus", "R", "", Mixed_mean +      fit_area_offset - sigma_multiplier*Mixed_sigma, Mixed_mean +        fit_area_offset +    sigma_multiplier*Mixed_sigma);
+                    auto fit_range_min = Mixed_mean + _fit_offset - _fit_sigma * Mixed_sigma;
+                    if (fit_range_min < 0)
+                        fit_range_min = 0;
+                    auto fit_range_max = Mixed_mean + _fit_offset + _fit_sigma * Mixed_sigma;
+                    if (fit_range_max > 45000)
+                        fit_range_max = 45000;
+                    Mixed_adc_hist->Fit("CrystalBall", "R", "", fit_range_min,      fit_range_max);
+
+                    // Mixed_fit_mu.push_back(Mixed_gaus->GetParameter(1));
+                    // Mixed_fit_sigma.push_back(Mixed_gaus->GetParameter(2));
+                    // Mixed_fit_resolution.push_back(Mixed_gaus->GetParameter      (2) / Mixed_gaus->GetParameter(1));
+                    // LG_fit_mu.push_back(LG_gaus->GetParameter(1) * 18);
+                    // LG_fit_sigma.push_back(LG_gaus->GetParameter(2) * 18);
+
+                    Mixed_fit_mu.push_back(CrystalBall->GetParameter(1));
+                    Mixed_fit_sigma.push_back(CrystalBall->GetParameter(2));
+                    Mixed_fit_resolution.push_back(CrystalBall->GetParameter        (2) / CrystalBall->GetParameter(1));
+                    Mixed_fit_para_offset.push_back(_fit_offset);
+                    Mixed_fit_para_range.push_back(_fit_sigma);
+                    Mixed_fit_para_adc.push_back(beam_energies[i]);
+
+                    Mixed_adc_hist_list.push_back(Mixed_adc_hist);
                 }
-
-                // normalize
-                auto Mixed_integral = Mixed_adc_hist->Integral();
-
-                Mixed_adc_hist->Scale(1.0/Mixed_integral);
-
-                auto _max_Mixed = Mixed_adc_hist->GetMaximum();
-
-                if (_max_Mixed > _global_max_Mixed)
-                    _global_max_Mixed = _max_Mixed;
-
-                // fitting with gaussian
-                auto Mixed_mean = Mixed_adc_hist->GetMean();
-                auto Mixed_sigma = Mixed_adc_hist->GetRMS();
-                auto Mixed_max = Mixed_adc_hist->GetMaximum();
-
-                // TF1* Mixed_gaus = new TF1("Mixed_gaus", "gaus",      Mixed_mean + fit_area_offset - sigma_multiplier*Mixed_sigma,        Mixed_mean + fit_area_offset +         sigma_multiplier*Mixed_sigma);
-                TF1* CrystalBall = new TF1("CrystalBall", "crystalball");
-
-                // set initial parameters
-                CrystalBall->SetParameter(0, Mixed_max);
-                CrystalBall->SetParameter(1, Mixed_mean);
-                CrystalBall->SetParameter(2, Mixed_sigma);
-                CrystalBall->SetParameter(3, 1.5);
-                CrystalBall->SetParameter(4, 0.5);
-
-                // Mixed_gaus->SetLineColor(kGreen);
-                // Mixed_gaus->SetLineWidth(3);
-                // Mixed_gaus->SetLineStyle(2);
-
-                CrystalBall->SetLineColor(kRed);
-                CrystalBall->SetLineWidth(3);
-                CrystalBall->SetLineStyle(2);
-
-                // Mixed_adc_hist->Fit("Mixed_gaus", "R", "", Mixed_mean +      fit_area_offset - sigma_multiplier*Mixed_sigma, Mixed_mean +        fit_area_offset +    sigma_multiplier*Mixed_sigma);
-                auto fit_range_min = Mixed_mean + _fit_offset - _fit_sigma * Mixed_sigma;
-                if (fit_range_min < 0)
-                    fit_range_min = 0;
-                auto fit_range_max = Mixed_mean + _fit_offset + _fit_sigma * Mixed_sigma;
-                if (fit_range_max > 45000)
-                    fit_range_max = 45000;
-                Mixed_adc_hist->Fit("CrystalBall", "R", "", fit_range_min,      fit_range_max);
-
-                // Mixed_fit_mu.push_back(Mixed_gaus->GetParameter(1));
-                // Mixed_fit_sigma.push_back(Mixed_gaus->GetParameter(2));
-                // Mixed_fit_resolution.push_back(Mixed_gaus->GetParameter      (2) / Mixed_gaus->GetParameter(1));
-                // LG_fit_mu.push_back(LG_gaus->GetParameter(1) * 18);
-                // LG_fit_sigma.push_back(LG_gaus->GetParameter(2) * 18);
-
-                Mixed_fit_mu.push_back(CrystalBall->GetParameter(1));
-                Mixed_fit_sigma.push_back(CrystalBall->GetParameter(2));
-                Mixed_fit_resolution.push_back(CrystalBall->GetParameter        (2) / CrystalBall->GetParameter(1));
-                Mixed_fit_para_offset.push_back(_fit_offset);
-                Mixed_fit_para_range.push_back(_fit_sigma);
-                Mixed_fit_para_adc.push_back(beam_energies[i]);
-
-                Mixed_adc_hist_list.push_back(Mixed_adc_hist);
             }
+        }
+    } else {
+        for (auto i=0; i < Mixed_adc_list.size(); i++){
+            auto Mixed_adc = Mixed_adc_list[i];
+
+            auto Mixed_adc_hist = new TH1D(Form("Mixed_adc_hist_%d", i),        Form("Mixed_adc_hist_%d", i), Mixed_n_bins, Mixed_min,      Mixed_max);
+
+            // set title size
+            Mixed_adc_hist->SetTitleSize(0.03);
+            Mixed_adc_hist->SetTitleOffset(1.5);
+            Mixed_adc_hist->SetTitle("Mixed ADC Distribution");
+            Mixed_adc_hist->SetStats(0);
+            Mixed_adc_hist->GetXaxis()->SetTitle("ADC");
+            Mixed_adc_hist->GetYaxis()->SetTitle("Normalized Counts");
+
+            std::string Mixed_energy_legend_text = Form("%d GeV",       beam_energies[i]);
+
+            // add run info
+            Mixed_energy_legend_text += " (" + csv_file_names[i].substr     (39, 3) + ")";
+            Mixed_energy_legend->AddEntry(Mixed_adc_hist,       Mixed_energy_legend_text.c_str(), "l");
+
+            // move to right to show y axis
+            Mixed_adc_hist->GetYaxis()->SetTitleOffset(1.5);
+
+            LOG(DEBUG) << "Mixed_adc->size(): " << Mixed_adc->size();
+            for (auto j=0; j < Mixed_adc->size(); j++){
+                Mixed_adc_hist->Fill(Mixed_adc->at(j));
+            // LOG(DEBUG) << "Mixed_adc->at(j): " << Mixed_adc->at(j);
+            }
+
+            // normalize
+            auto Mixed_integral = Mixed_adc_hist->Integral();
+            Mixed_adc_hist->Scale(1.0/Mixed_integral);
+            auto _max_Mixed = Mixed_adc_hist->GetMaximum();
+            if (_max_Mixed > _global_max_Mixed)
+                _global_max_Mixed = _max_Mixed;
+            Mixed_adc_hist_list.push_back(Mixed_adc_hist);
         }
     }
 
@@ -446,14 +522,17 @@ int main(int argc, char** argv) {
     cresolution->Close();
 
     // save HG mu to csv file
-    std::ofstream Mixed_mu_csv;
-    auto header = "Mean,Sigma,Resolution,FitRange,FitOffset,FitADC";
-    Mixed_mu_csv.open(Form("../tmp/Mixed_mu_%d.csv", config));
-    Mixed_mu_csv << header << std::endl;
-    for (auto i=0; i < Mixed_fit_mu.size(); i++){
-        Mixed_mu_csv << Mixed_fit_mu[i] << "," << Mixed_fit_sigma[i] << "," << Mixed_fit_resolution[i] << "," << Mixed_fit_para_range[i] << "," << Mixed_fit_para_offset[i] << "," << Mixed_fit_para_adc[i] << std::endl;
+    if (enable_fit) {
+        LOG(INFO) << "Saving fit results to csv file ...";
+        std::ofstream Mixed_mu_csv;
+        auto header = "Mean,Sigma,Resolution,FitRange,FitOffset,FitADC";
+        Mixed_mu_csv.open(Form("../tmp/Mixed_mu_%d.csv", config));
+        Mixed_mu_csv << header << std::endl;
+        for (auto i=0; i < Mixed_fit_mu.size(); i++){
+            Mixed_mu_csv << Mixed_fit_mu[i] << "," << Mixed_fit_sigma[i] << "," << Mixed_fit_resolution[i] << "," << Mixed_fit_para_range[i] << "," << Mixed_fit_para_offset[i] << "," << Mixed_fit_para_adc[i] << std::endl;
+        }
+        Mixed_mu_csv.close();
     }
-    Mixed_mu_csv.close();
 
 
     return 0;
