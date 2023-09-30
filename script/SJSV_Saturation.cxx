@@ -42,7 +42,6 @@ int main(int argc, char** argv) {
     LOG(INFO) << "Run number: " << run_number;
 
     auto root_file_name = Form("../tmp/parsed_Run0%dv.root", run_number);
-    auto export_file_name = Form("../tmp/ERcon_Run0%dv.root", run_number);
     std::string filename_mapping_csv = "../data/config/Mapping_tb2023Sep_VMM2.csv";
     auto hglg_file_name = Form("../tmp/HL_Correlation/HL_Corr_Run0%dv.root", run_number);
     // auto hglg_file_name = "../tmp/HL_Correlation/HL_Corr_Run037v.root";
@@ -100,12 +99,6 @@ int main(int argc, char** argv) {
     }
 
     LOG(DEBUG) << "Transformed TVectors to vectors.";
-
-    auto root_file = new TFile(export_file_name, "RECREATE");
-    root_file->cd();
-
-    root_file->mkdir("Calibrated Hit Map");
-    root_file->cd("Calibrated Hit Map");
 
     std::vector<Double_t> original_event_sum;
     std::vector<Double_t> calibrated_event_sum;

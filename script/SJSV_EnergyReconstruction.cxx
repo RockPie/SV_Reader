@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
 
     int run_number = 34;
     bool save_to_rootfile = true;
-    bool save_comparison_to_png = false;
+    bool save_comparison_to_png = true;
     auto bcid_cycle     = uint8_t(25);
     auto tdc_slope      = uint8_t(60);
     Double_t reconstructed_threshold_time_ns = 10000;
@@ -30,12 +30,33 @@ int main(int argc, char** argv) {
     auto export_file_name = Form("../tmp/ERcon_Run0%dv.root", run_number);
     std::string filename_mapping_csv = "../data/config/Mapping_tb2023Sep_VMM2.csv";
     auto hglg_file_name = Form("../tmp/HL_Correlation/HL_Corr_Run0%dv.root", run_number);
+    auto energy_compare_file_name = Form("../pics/EnergyRecon/energy_distribution_run%d.png", run_number);
+    auto original_hist_csv_file_name = Form("../tmp/HL_Correlation/HG_ADC_sum_run0%d.csv", run_number);
+    auto mixed_hist_csv_file_name = Form("../tmp/HL_Correlation/Mixed_ADC_sum_run0%d.csv", run_number);
 
     int opt;
-    while ((opt = getopt(argc, argv, "r:")) != -1){
+    while ((opt = getopt(argc, argv, "m:d:c:h:e:g:n:")) != -1){
         switch (opt){
-            case 'r':
-                run_number = atoi(optarg);
+            case 'm':
+                filename_mapping_csv = optarg;
+                break;
+            case 'd':
+                root_file_name = optarg;
+                break;
+            case 'c':
+                hglg_file_name = optarg;
+                break;
+            case 'h':
+                export_file_name = optarg;
+                break;
+            case 'e':
+                energy_compare_file_name = optarg;
+                break;
+            case 'g':
+                original_hist_csv_file_name = optarg;
+                break;
+            case 'n':
+                mixed_hist_csv_file_name = optarg;
                 break;
             default:
                 LOG(ERROR) << "Wrong arguments!";
@@ -119,7 +140,7 @@ int main(int argc, char** argv) {
         auto event_adc_sum_hg = eventbuilder.get_event_hg_sum(event);
         auto mapped_event = eventbuilder.map_event(event, *eventbuilder.get_mapping_info_ptr());
 
-        if (save_to_rootfile){
+        if (save_to_rootfile && i < 100){
             auto calibrated_event_canvas = new TCanvas(Form("Calibrated Event %d", i), Form("Calibrated Event %d", i), 800, 600);
 
             auto event_map_calibrated = eventbuilder.plot_mapped_event_calib(mapped_event, hglg_cell_id, hglg_corr_slope_vec, hglg_corr_offset_vec);
@@ -203,13 +224,13 @@ int main(int argc, char** argv) {
     energy_distribution_canvas->SetGrid();
 
     if(save_comparison_to_png){
-        energy_distribution_canvas->SaveAs(Form("../pics/EnergyRecon/energy_distribution_run%d.png", run_number));
+        energy_distribution_canvas->SaveAs(energy_compare_file_name);
     }
     energy_distribution_canvas->Close();
 
     // save original and calibrated energy sum values to csv
     std::ofstream HG_ADC_sum_csv;
-    HG_ADC_sum_csv.open(Form("../tmp/HL_Correlation/HG_ADC_sum_run0%d.csv", run_number));
+    HG_ADC_sum_csv.open(original_hist_csv_file_name);
     std::string header = "HG_ADC_sum\n";
     HG_ADC_sum_csv << header;
     for (auto i=0; i<original_event_sum.size(); i++){
@@ -218,7 +239,7 @@ int main(int argc, char** argv) {
     HG_ADC_sum_csv.close();
 
     std::ofstream Mixed_ADC_sum_csv;
-    Mixed_ADC_sum_csv.open(Form("../tmp/HL_Correlation/Mixed_ADC_sum_run0%d.csv", run_number));
+    Mixed_ADC_sum_csv.open(mixed_hist_csv_file_name);
     header = "Mixed_ADC_sum\n";
     Mixed_ADC_sum_csv << header;
     for (auto i=0; i<calibrated_event_sum.size(); i++){
